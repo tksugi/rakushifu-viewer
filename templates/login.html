@@ -216,10 +216,15 @@
                         ログイン
                     </button>
                 </form>
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('sample.sample_index') }}">ログインなしでサンプルを試す</a>
+                    <p class="small text-secondary mt-2 mb-0">架空のスタッフ・シフトで各機能を確認できます。</p>
+                </div>
             </div>
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='session-events.js') }}"></script>
     <script>
         const form = document.getElementById('loginForm');
         const errorMessage = document.getElementById('errorMessage');
@@ -247,6 +252,7 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    window.shiftSessionEvents.publish();
                     window.location.href = '/';
                 } else {
                     errorText.textContent = data.error || 'ログインに失敗しました';

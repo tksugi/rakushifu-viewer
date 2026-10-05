@@ -1069,3 +1069,26 @@ body {
     .month-panel { padding: 18px; }
     .month-eyebrow { letter-spacing: .08em; }
 }
+/* Synthetic sample notice stays visible on every tab. */
+.sample-notice {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 20px;
+    padding: 14px 18px;
+    border: 1px solid #c7d2fe;
+    border-radius: 14px;
+    background: #eef2ff;
+    color: #3730a3;
+    font-size: .85rem;
+    line-height: 1.6;
+}
+/* Updates retain the current view; private views are concealed during resume checks. */
+.data-update-status {
+    color: var(--text-muted, #667085);
+    font-size: 0.8rem;
+    margin: 0.5rem 0;
+}
+.modal-content > .data-update-status { padding: 0 1.25rem; }
+.session-checking .page-shell,
+.session-checking .floating-nav,
+.session-checking #detailModal { visibility: hidden; }

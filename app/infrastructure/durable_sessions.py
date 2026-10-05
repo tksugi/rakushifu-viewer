@@ -4,6 +4,7 @@ import json
 import re
 import secrets
 import time
+import hashlib
 
 from flask import request
 
@@ -38,6 +39,7 @@ class DurableConnection:
     def __init__(self, stub, viewer):
         self.stub = stub
         self.viewer = viewer
+        self.cache_metadata = None
 
     def fetch(self, year, month, store_id, genre_id):
         result = json.loads(_run(self.stub.month(year, month)))
@@ -49,6 +51,7 @@ class DurableConnection:
             raise UpstreamError(result["message"])
         if result.get("error") != "ok":
             raise RuntimeError("unexpected Durable Object month result")
+        self.cache_metadata = result["cache_metadata"]
         return month_from_json(result["month"])
 
     def close(self):
@@ -71,12 +74,14 @@ class DurableSessionStore:
         connection = value.connection
         state = connection.export_state()
         state["expires_at"] = time.time() + self.lifetime_seconds
+        state["cache_scope"] = value.cache_scope
         initial = next(iter(value.cache.items()), None)
         initial_month = (month_to_json(initial[1][1]) if initial else "")
         initial_key = list(initial[0]) if initial else []
         _run(self._stub(token).create(
             json.dumps(state, ensure_ascii=False), initial_month,
-            json.dumps(initial_key), self.cache_seconds, self.max_cached_months))
+            json.dumps(initial_key), self.cache_seconds, self.max_cached_months,
+            json.dumps(value.month_metadata.get(tuple(initial_key)))))
         connection.close()
         return token
 
@@ -88,7 +93,12 @@ class DurableSessionStore:
             return None
         state = json.loads(serialized)
         viewer = viewer_from_dict(state["viewer"])
-        return ActiveSession(viewer, DurableConnection(self._stub(token), viewer))
+        active = ActiveSession(viewer, DurableConnection(self._stub(token), viewer))
+        # Old sessions have no scope field. This digest cannot authenticate a request.
+        active.cache_scope = state.get("cache_scope") or hashlib.sha256(
+            ("browser-cache:" + token).encode()).hexdigest()
+        active.expires_at = state["expires_at"]
+        return active
 
     def delete(self, token: str):
         if TOKEN_PATTERN.fullmatch(token):

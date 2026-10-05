@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body data-cache-seconds="{{ config.CACHE_SECONDS }}">
+<body data-cache-seconds="{{ config.CACHE_SECONDS }}" data-api-prefix="{{ '/sample' if sample_mode else '' }}">
 
     <header class="app-header" id="appHeader">
         <div class="header-inner">
@@ -19,15 +19,25 @@
                 <span class="brand-icon" aria-hidden="true"><i class="bi bi-calendar2-week"></i></span>
                 <span>シフトビューア</span>
             </div>
+            {% if sample_mode %}
+            <a class="logout-link" href="{{ url_for('routes.login_page') }}">サンプルを終了</a>
+            {% else %}
             <form method="post" action="{{ url_for('routes.logout') }}">
                 <button class="logout-link" type="submit" aria-label="ログアウト">
                     <i class="bi bi-box-arrow-right" aria-hidden="true"></i><span>ログアウト</span>
                 </button>
             </form>
+            {% endif %}
         </div>
     </header>
 
     <main class="page-shell">
+    {% if sample_mode %}
+    <aside class="sample-notice" role="note">
+        <strong>サンプル表示 · すべて架空のデータです</strong>
+        <span>60人のスタッフと月ごとのシフトで、カレンダー・検索・給与概算をお試しください。実際のらくしふへの通信は行いません。</span>
+    </aside>
+    {% endif %}
     <div class="calendar-layout" id="calendarPage">
     <div class="calendar-sidebar">
     <section class="month-panel" aria-label="表示中の月">
@@ -103,7 +113,7 @@
                 </label>
             </div>
             <div id="payResults" aria-live="polite"></div>
-            <p class="pay-note">らくしふのシフトと休憩時刻から計算した概算です。深夜帯は22:00〜翌5:00。残業・休日割増、交通費、税金は含みません。時給と割増率はこのブラウザに保存します。</p>
+            <p class="pay-note">{{ '架空のシフトと休憩時刻' if sample_mode else 'らくしふのシフトと休憩時刻' }}から計算した概算です。深夜帯は22:00〜翌5:00。残業・休日割増、交通費、税金は含みません。時給と割増率はこのブラウザに保存します。</p>
         </div>
     </section>
     </main>
@@ -150,6 +160,9 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='session-events.js') }}"></script>
+    <script src="{{ url_for('static', filename='data-cache.js') }}"></script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script src="{{ url_for('static', filename='view-loader.js') }}"></script>
 </body>
 </html>

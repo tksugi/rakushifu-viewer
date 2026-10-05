@@ -10,6 +10,11 @@ let modalRequestId = 0;
 let modalView = null;
 let modalHistory = [];
 let staffSelection = null;
+let shiftSelection = null;
+let modalTransition = null;
+let activePage = 'calendar';
+let pendingPageScroll = null;
+const pageScrollPositions = { calendar: 0, search: 0, pay: 0 };
 
 function rememberModalView() {
     if (!modalView || !detailModalElement.classList.contains('show')) {
@@ -17,6 +22,7 @@ function rememberModalView() {
         return;
     }
     const body = document.getElementById(modalView === 'staff' ? 'staffDetailBody' : 'modalBody');
+    if (modalHistory.length >= 20) modalHistory.shift();
     modalHistory.push({
         view: modalView,
         nodes: Array.from(body.childNodes),
@@ -24,6 +30,7 @@ function rememberModalView() {
         focusedElement: document.activeElement,
         staffData: currentStaffData,
         staffSelection,
+        shiftSelection,
         headings: Object.fromEntries(['modalTitle', 'modalDateSub', 'staffDetailName',
             'staffDetailCode', 'staffDetailBirthday'].map(id => [id, document.getElementById(id).textContent])),
     });
@@ -36,15 +43,19 @@ function setModalView(view) {
     document.getElementById('modalBody').hidden = isStaff;
     document.getElementById('staffDetailHeader').hidden = !isStaff;
     document.getElementById('staffDetailBody').hidden = !isStaff;
+    for (const id of ['modalBodyStatus', 'staffDetailBodyStatus']) {
+        const status = document.getElementById(id);
+        if (status) status.hidden = !status.textContent || (id === 'staffDetailBodyStatus') !== isStaff;
+    }
     const titleId = isStaff ? 'staffDetailName' : 'modalTitle';
     detailModalElement.setAttribute('aria-labelledby', titleId);
     if (detailModalElement.classList.contains('show')) document.getElementById(titleId).focus();
 }
 
 async function authenticatedFetch(url, options) {
-    const response = await fetch(url, options);
+    const response = await fetch(`${document.body.dataset.apiPrefix || ''}${url}`, options);
     if (response.status === 401) {
-        window.location.href = '/login';
+        endSession();
         throw new Error('Login required');
     }
     return response;
@@ -56,17 +67,31 @@ function escapeHtml(value) {
     })[character]);
 }
 
+detailModalElement.addEventListener('show.bs.modal', () => { modalTransition = 'showing'; });
 detailModalElement.addEventListener('hide.bs.modal', () => {
+    modalTransition = 'hiding';
     modalRequestId++;
     modalView = null;
     currentStaffData = null;
     staffSelection = null;
+    shiftSelection = null;
     modalHistory = [];
+    scheduleVisibleRefresh();
 });
 
 detailModalElement.addEventListener('shown.bs.modal', () => {
+    modalTransition = null;
     document.getElementById(modalView === 'staff' ? 'staffDetailName' : 'modalTitle').focus();
 });
+detailModalElement.addEventListener('hidden.bs.modal', () => { modalTransition = null; });
+
+function openDetailModal() {
+    if (modalTransition === 'hiding') {
+        detailModalElement.addEventListener('hidden.bs.modal', () => {
+            if (modalView && !sessionEnded) detailModal.show();
+        }, { once: true });
+    } else detailModal.show();
+}
 
 const appHeader = document.getElementById('appHeader');
 window.addEventListener('scroll', () => {
@@ -81,48 +106,26 @@ function updateMonthDisplay() {
     document.getElementById('mobileMonth').textContent = `${year}年${month + 1}月`;
 }
 
-async function fetchCalendarData(year, month) {
-    try {
-        const response = await authenticatedFetch(`/api/calendar?year=${year}&month=${month + 1}`);
-        if (!response.ok) throw new Error('API Error');
-        return await response.json();
-    } catch (error) {
-        console.error('Failed to fetch calendar data:', error);
-        return null;
-    }
-}
-
 let calendarRequestId = 0;
-let calendarRefreshTimer;
-const configuredCacheSeconds = Number(document.body.dataset.cacheSeconds);
-const calendarRefreshMs = (Number.isFinite(configuredCacheSeconds) && configuredCacheSeconds >= 0
-    ? configuredCacheSeconds : 120) * 1000 + 1000;
 
-async function renderCalendar(silent = false) {
+async function renderCalendar() {
     const requestId = ++calendarRequestId;
-    clearTimeout(calendarRefreshTimer);
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-
     updateMonthDisplay();
-
-    if (!silent) {
+    const monthKey = `${year}-${month + 1}`;
+    if (viewSlots.get('calendarContainer')?.descriptor.key !== `calendar:${monthKey}`) {
         document.getElementById('mobileShiftSummary').textContent = '自分の勤務日を確認中…';
-        calendarContainer.innerHTML = `
-            <div class="loading-placeholder">
-                <div class="spinner-ring"></div>
-                <span class="loading-text">読み込み中</span>
-            </div>`;
     }
+    await loadView(calendarContainer, {
+        key: `calendar:${monthKey}`, month: monthKey,
+        url: `/api/calendar?year=${year}&month=${month + 1}`,
+    }, data => drawCalendar(data, year, month),
+    () => requestId === calendarRequestId && !calendarPage.hidden);
+}
 
-    const shiftData = await fetchCalendarData(year, month);
-    if (requestId !== calendarRequestId) return;
-    if (shiftData === null) {
-        if (!silent) document.getElementById('mobileShiftSummary').textContent = '自分の勤務日を取得できませんでした';
-        if (!silent) calendarContainer.innerHTML = '<div class="loading-placeholder">シフトを取得できませんでした</div>';
-        calendarRefreshTimer = setTimeout(() => renderCalendar(true), Math.min(calendarRefreshMs, 30000));
-        return;
-    }
+function drawCalendar(shiftData, year, month) {
+    const animate = !calendarContainer.querySelector('.calendar-day');
     const cells = document.createDocumentFragment();
 
     const firstDay = new Date(year, month, 1);
@@ -150,7 +153,7 @@ async function renderCalendar(silent = false) {
                         dateObj.getFullYear() === today.getFullYear();
 
         const cell = document.createElement('div');
-        let classes = 'calendar-day animate-in';
+        let classes = `calendar-day${animate ? ' animate-in' : ''}`;
         if (dayData.has_me) classes += ' has-my-shift';
         if (isToday) classes += ' is-today';
         if (dayOfWeek === 0) classes += ' day-sun';
@@ -177,121 +180,102 @@ async function renderCalendar(silent = false) {
     }
     calendarContainer.replaceChildren(cells);
     document.getElementById('mobileShiftSummary').textContent = `自分の勤務日：${myShiftDays}日`;
-    calendarRefreshTimer = setTimeout(() => renderCalendar(true), calendarRefreshMs);
 }
 
-async function showDetail(dateStr) {
-    rememberModalView();
+async function showDetail(dateStr, rememberHistory = true) {
+    if (rememberHistory) rememberModalView();
     const requestId = ++modalRequestId;
+    shiftSelection = dateStr;
     currentStaffData = null;
     const dateObj = new Date(`${dateStr}T00:00:00`);
     const days = ['日', '月', '火', '水', '木', '金', '土'];
-    const dayName = days[dateObj.getDay()];
-
-    document.getElementById('modalTitle').textContent =
-        `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
-    document.getElementById('modalDateSub').textContent =
-        `${dateObj.getFullYear()}年 ${dayName}曜日`;
-
+    document.getElementById('modalTitle').textContent = `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+    document.getElementById('modalDateSub').textContent = `${dateObj.getFullYear()}年 ${days[dateObj.getDay()]}曜日`;
     setModalView('shift');
+    const body = document.getElementById('modalBody');
+    body.scrollTop = 0;
+    openDetailModal();
+    await loadView(body, {
+        key: `day:${dateStr}`, month: `${dateObj.getFullYear()}-${dateObj.getMonth() + 1}`,
+        url: `/api/shifts?date=${dateStr}`,
+    }, data => drawDay(data, dateObj), () => requestId === modalRequestId && modalView === 'shift');
+}
 
-    document.getElementById('modalBody').innerHTML = `
-        <div class="d-flex justify-content-center py-5">
-            <div class="spinner-ring"></div>
-        </div>`;
+function drawDay(data, dateObj) {
+    const modalBody = document.getElementById('modalBody');
+    modalBody.replaceChildren();
+    if (data.workers && data.workers.length > 0) {
+        let separatorShown = false;
+        const hasMyShift = data.has_my_shift;
 
-    detailModal.show();
+        data.workers.forEach((worker) => {
+            if (hasMyShift && !worker.is_me && !worker.is_overlapping && !separatorShown) {
+                const sep = document.createElement('div');
+                sep.className = 'separator';
+                sep.textContent = '時間が被っていないスタッフ';
+                modalBody.appendChild(sep);
+                separatorShown = true;
+            }
 
-    try {
-        const response = await authenticatedFetch(`/api/shifts?date=${dateStr}`);
-        if (!response.ok) throw new Error('API Error');
-        const data = await response.json();
-        if (requestId !== modalRequestId) return;
+            const div = document.createElement('div');
+            let cardClass = 'shift-detail-card';
+            let sameEndBadge = '';
 
-        const modalBody = document.getElementById('modalBody');
-        modalBody.innerHTML = '';
-        modalBody.scrollTop = 0;
+            if (worker.is_me) {
+                cardClass += ' is-me';
+            } else if (worker.is_same_end) {
+                cardClass += ' same-end';
+                sameEndBadge = '<span class="same-end-badge"><i class="bi bi-stars"></i> Last</span>';
+            }
+            div.className = cardClass;
 
-        if (data.workers && data.workers.length > 0) {
-            let separatorShown = false;
-            const hasMyShift = data.has_my_shift;
+            const rankBadge = worker.rank
+                ? `<span class="worker-rank">${escapeHtml(worker.rank)}</span>` : '';
+            const ageDisplay = worker.age
+                ? `<span class="worker-age">${escapeHtml(worker.age)}歳</span>` : '';
 
-            data.workers.forEach((worker) => {
-                if (hasMyShift && !worker.is_me && !worker.is_overlapping && !separatorShown) {
-                    const sep = document.createElement('div');
-                    sep.className = 'separator';
-                    sep.textContent = '時間が被っていないスタッフ';
-                    modalBody.appendChild(sep);
-                    separatorShown = true;
-                }
-
-                const div = document.createElement('div');
-                let cardClass = 'shift-detail-card';
-                let sameEndBadge = '';
-
-                if (worker.is_me) {
-                    cardClass += ' is-me';
-                } else if (worker.is_same_end) {
-                    cardClass += ' same-end';
-                    sameEndBadge = '<span class="same-end-badge"><i class="bi bi-stars"></i> Last</span>';
-                }
-                div.className = cardClass;
-
-                const rankBadge = worker.rank
-                    ? `<span class="worker-rank">${escapeHtml(worker.rank)}</span>` : '';
-                const ageDisplay = worker.age
-                    ? `<span class="worker-age">${escapeHtml(worker.age)}歳</span>` : '';
-
-                div.innerHTML = `
-                    <div class="worker-card-header">
-                        <div class="worker-identity">
-                            <button type="button" class="worker-name-link">
-                                <span class="worker-name">${escapeHtml(worker.name)}</span>
-                            </button>
-                            ${ageDisplay}
-                            ${rankBadge}
-                        </div>
-                        <div class="worker-badges">
-                            ${sameEndBadge}
-                            ${worker.is_me ? '<span class="badge-me">あなた</span>' : ''}
-                        </div>
+            div.innerHTML = `
+                <div class="worker-card-header">
+                    <div class="worker-identity">
+                        <button type="button" class="worker-name-link">
+                            <span class="worker-name">${escapeHtml(worker.name)}</span>
+                        </button>
+                        ${ageDisplay}
+                        ${rankBadge}
                     </div>
-                    <div class="worker-time">
-                        <i class="bi bi-clock"></i>${escapeHtml(worker.time)}
+                    <div class="worker-badges">
+                        ${sameEndBadge}
+                        ${worker.is_me ? '<span class="badge-me">あなた</span>' : ''}
                     </div>
-                    ${worker.rest_times && worker.rest_times.length
-                        ? `<div class="worker-time"><i class="bi bi-cup-hot"></i>休憩 ${escapeHtml(worker.rest_times.join(', '))}</div>` : ''}
-                `;
-                const workerButton = div.querySelector('.worker-name-link');
-                workerButton.addEventListener('click', () => {
-                    showStaffDetail(worker.user_id, dateObj.getFullYear(), dateObj.getMonth() + 1);
-                });
-                modalBody.appendChild(div);
-
-                if (worker.is_me && hasMyShift && data.workers.length > 1) {
-                    const sep = document.createElement('div');
-                    sep.className = 'separator';
-                    sep.textContent = '一緒に出勤するスタッフ';
-                    modalBody.appendChild(sep);
-                }
+                </div>
+                <div class="worker-time">
+                    <i class="bi bi-clock"></i>${escapeHtml(worker.time)}
+                </div>
+                ${worker.rest_times && worker.rest_times.length
+                    ? `<div class="worker-time"><i class="bi bi-cup-hot"></i>休憩 ${escapeHtml(worker.rest_times.join(', '))}</div>` : ''}
+            `;
+            const workerButton = div.querySelector('.worker-name-link');
+            workerButton.dataset.focusKey = `worker:${worker.user_id}`;
+            workerButton.addEventListener('click', () => {
+                showStaffDetail(worker.user_id, dateObj.getFullYear(), dateObj.getMonth() + 1);
             });
-        } else {
-            modalBody.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon"><i class="bi bi-calendar-x"></i></div>
-                    <p>予定されているシフトはありません</p>
-                </div>`;
-        }
+            modalBody.appendChild(div);
 
-    } catch (error) {
-        if (requestId !== modalRequestId) return;
-        console.error(error);
-        document.getElementById('modalBody').innerHTML = `
-            <div class="error-state">
-                <div class="error-state-icon"><i class="bi bi-exclamation-triangle"></i></div>
-                <p>データの取得に失敗しました</p>
+            if (worker.is_me && hasMyShift && data.workers.length > 1) {
+                const sep = document.createElement('div');
+                sep.className = 'separator';
+                sep.textContent = '一緒に出勤するスタッフ';
+                modalBody.appendChild(sep);
+            }
+        });
+    } else {
+        modalBody.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="bi bi-calendar-x"></i></div>
+                <p>予定されているシフトはありません</p>
             </div>`;
     }
+
 }
 
 function changeMonth(delta) {
@@ -315,6 +299,12 @@ function refreshVisibleMonth() {
 }
 
 function setActivePage(page) {
+    if (page !== activePage) {
+        pageScrollPositions[activePage] = window.scrollY;
+        pendingPageScroll = pageScrollPositions[page];
+        clearTimeout(visibleRefreshTimer);
+    }
+    activePage = page;
     calendarPage.hidden = page !== 'calendar';
     searchPage.hidden = page !== 'search';
     payPage.hidden = page !== 'pay';
@@ -328,7 +318,7 @@ function setActivePage(page) {
         if (active) button.setAttribute('aria-current', 'page');
         else button.removeAttribute('aria-current');
     }
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: pageScrollPositions[page], behavior: 'instant' });
 }
 
 function showCalendarPage() {
@@ -368,46 +358,31 @@ async function showStaffDetail(userId, year, month, rememberHistory = true) {
     staffSelection = { userId, year, month };
     const requestId = ++modalRequestId;
     currentStaffData = null;
-    document.getElementById('staffDetailName').textContent = '読み込み中...';
+    document.getElementById('staffDetailName').textContent = 'スタッフ詳細';
     document.getElementById('staffDetailCode').textContent = '—';
     document.getElementById('staffDetailBirthday').textContent = '—';
-
-    document.getElementById('staffDetailBody').innerHTML = `
-        <div class="d-flex justify-content-center py-5">
-            <div class="spinner-ring"></div>
-        </div>`;
-    addStaffMonthSwitcher();
-
     setModalView('staff');
-    document.getElementById('staffDetailBody').scrollTop = 0;
-    detailModal.show();
+    const body = document.getElementById('staffDetailBody');
+    // Reopening resets the heading and selection, even when the body was retained.
+    viewSlots.delete(body.id);
+    body.scrollTop = 0;
+    openDetailModal();
+    await loadView(body, {
+        key: `staff:${year}-${month}:${userId}`, month: `${year}-${month}`,
+        url: `/api/staff/${userId}?year=${year}&month=${month}`,
+    }, drawStaff, () => requestId === modalRequestId && modalView === 'staff');
+}
 
-    try {
-        const response = await authenticatedFetch(`/api/staff/${userId}?year=${year}&month=${month}`);
-        if (!response.ok) throw new Error('API Error');
+function drawStaff(data) {
+    currentStaffData = data;
+    document.getElementById('staffDetailName').textContent = currentStaffData.name || '未設定';
+    document.getElementById('staffDetailCode').textContent = currentStaffData.employee_code || '未設定';
+    const age = currentStaffData.age;
+    const ageDisplay = age === null || age === undefined || age === '' ? '年齢未設定' : `${age}歳`;
+    document.getElementById('staffDetailBirthday').textContent =
+        `${formatBirthday(currentStaffData.birthday)} (${ageDisplay})`;
 
-        const data = await response.json();
-        if (requestId !== modalRequestId) return;
-        currentStaffData = data;
-
-        document.getElementById('staffDetailName').textContent = currentStaffData.name || '未設定';
-        document.getElementById('staffDetailCode').textContent = currentStaffData.employee_code || '未設定';
-        const age = currentStaffData.age;
-        const ageDisplay = age === null || age === undefined || age === '' ? '年齢未設定' : `${age}歳`;
-        document.getElementById('staffDetailBirthday').textContent =
-            `${formatBirthday(currentStaffData.birthday)} (${ageDisplay})`;
-
-        renderStaffSchedule();
-    } catch (error) {
-        if (requestId !== modalRequestId) return;
-        console.error(error);
-        document.getElementById('staffDetailBody').innerHTML = `
-            <div class="error-state">
-                <div class="error-state-icon"><i class="bi bi-exclamation-triangle"></i></div>
-                <p>データの取得に失敗しました</p>
-            </div>`;
-        addStaffMonthSwitcher();
-    }
+    renderStaffSchedule();
 }
 
 function changeStaffMonth(delta) {
@@ -507,12 +482,32 @@ function backModal() {
     modalRequestId++;
     currentStaffData = previous.staffData;
     staffSelection = previous.staffSelection;
+    shiftSelection = previous.shiftSelection;
     for (const [id, text] of Object.entries(previous.headings)) document.getElementById(id).textContent = text;
     const body = document.getElementById(previous.view === 'staff' ? 'staffDetailBody' : 'modalBody');
     body.replaceChildren(...previous.nodes);
     setModalView(previous.view);
     body.scrollTop = previous.scrollTop;
     if (previous.focusedElement?.isConnected) previous.focusedElement.focus({ preventScroll: true });
+    viewSlots.delete(body.id);
+    const scrollTop = previous.scrollTop;
+    const restoredRequestId = modalRequestId + 1;
+    const restoreScroll = () => {
+        if (modalRequestId !== restoredRequestId) return;
+        body.scrollTop = scrollTop;
+        const oldFocus = previous.focusedElement;
+        const key = oldFocus?.dataset.focusKey || oldFocus?.dataset.date;
+        const focus = oldFocus?.isConnected ? oldFocus
+            : Array.from(body.querySelectorAll('button')).find(button => key &&
+                (button.dataset.focusKey || button.dataset.date) === key);
+        focus?.focus({ preventScroll: true });
+    };
+    if (previous.view === 'staff') {
+        const { userId, year, month } = staffSelection;
+        showStaffDetail(userId, year, month, false).then(restoreScroll);
+    } else {
+        showDetail(shiftSelection, false).then(restoreScroll);
+    }
 }
 
 let searchTimer;
@@ -525,10 +520,9 @@ function updateSearchMonthDisplay() {
 function showSearchPage() {
     setActivePage('search');
     updateSearchMonthDisplay();
-    document.getElementById('staffSearchInput').value = '';
     searchStaff();
     if (window.matchMedia('(min-width: 760px)').matches) {
-        document.getElementById('staffSearchInput').focus();
+        document.getElementById('staffSearchInput').focus({ preventScroll: true });
     }
 }
 
@@ -538,35 +532,43 @@ async function searchStaff() {
     const month = currentDate.getMonth() + 1;
     const query = document.getElementById('staffSearchInput').value.trim();
     const results = document.getElementById('searchResults');
-    results.textContent = '検索中...';
-    try {
-        const response = await authenticatedFetch(`/api/staff?year=${year}&month=${month}&q=${encodeURIComponent(query)}`);
-        if (!response.ok) throw new Error('Search failed');
-        const people = await response.json();
-        if (requestId !== searchRequest) return;
-        results.innerHTML = '';
-        if (!people.length) {
-            results.textContent = '該当するスタッフはいません';
-            return;
-        }
-        for (const person of people) {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'search-person';
-            button.innerHTML = `<span><strong>${escapeHtml(person.name)}</strong><small>${escapeHtml(person.employee_code || 'コード未設定')}</small></span><i class="bi bi-chevron-right"></i>`;
-            button.addEventListener('click', () => showStaffDetail(person.user_id, year, month));
-            results.appendChild(button);
-        }
-    } catch (error) {
-        if (requestId === searchRequest) results.textContent = '検索に失敗しました';
+    await loadView(results, {
+        key: `search:${year}-${month}:${query}`, month: `${year}-${month}`,
+        url: `/api/staff?year=${year}&month=${month}&q=${encodeURIComponent(query)}`,
+    }, people => drawSearch(people, year, month),
+    () => requestId === searchRequest && !searchPage.hidden
+        && document.getElementById('staffSearchInput').value.trim() === query, '検索中…');
+}
+
+function drawSearch(people, year, month) {
+    const results = document.getElementById('searchResults');
+    results.innerHTML = '';
+    if (!people.length) {
+        results.textContent = '該当するスタッフはいません';
+        return;
+    }
+    for (const person of people) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'search-person';
+        button.dataset.focusKey = `person:${person.user_id}`;
+        button.innerHTML = `<span><strong>${escapeHtml(person.name)}</strong><small>${escapeHtml(person.employee_code || 'コード未設定')}</small></span><i class="bi bi-chevron-right"></i>`;
+        button.addEventListener('click', () => showStaffDetail(person.user_id, year, month));
+        results.appendChild(button);
     }
 }
 
 document.getElementById('staffSearchInput').addEventListener('input', () => {
+    searchRequest++;
+    clearTimeout(visibleRefreshTimer);
     clearTimeout(searchTimer);
     searchTimer = setTimeout(searchStaff, 250);
 });
 let payUserId = null;
+
+function paySettingsKey() {
+    return `${document.body.dataset.apiPrefix ? 'sample-' : ''}pay-settings-${payUserId}`;
+}
 let payRequest = 0;
 let payTimer;
 
@@ -579,68 +581,54 @@ function paySettings() {
 
 async function fetchPayEstimate(save = true) {
     const requestId = ++payRequest;
+    let settings;
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1;
+    await loadView(document.getElementById('payResults'), () => {
+        // Session initialization can restore this user's saved settings.
+        settings = paySettings();
+        if (save && payUserId !== null) {
+            try { localStorage.setItem(paySettingsKey(), JSON.stringify(settings)); }
+            catch (error) { /* Settings storage is optional. */ }
+        }
+        return {
+            key: `pay:${year}-${month}:${settings.hourly_wage}:${settings.night_bonus_percent}`,
+            month: `${year}-${month}`, url: '/api/pay/estimate',
+            options: {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ year, month, ...settings, hourly_wage: settings.hourly_wage || '0' }),
+            },
+        };
+    }, data => drawPay(data, settings),
+    () => requestId === payRequest && !payPage.hidden
+        && (!settings || JSON.stringify(paySettings()) === JSON.stringify(settings)), '計算中…');
+}
+
+function drawPay(data, settings) {
     const result = document.getElementById('payResults');
-    result.textContent = '計算中...';
-    const settings = paySettings();
-    try {
-        const response = await authenticatedFetch('/api/pay/estimate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                year: currentDate.getFullYear(), month: currentDate.getMonth() + 1,
-                ...settings, hourly_wage: settings.hourly_wage || '0',
-            }),
-        });
-        const data = await response.json();
-        if (requestId !== payRequest) return;
-        if (!response.ok) {
-            result.textContent = data.error || '計算に失敗しました';
-            return;
-        }
-        payUserId = data.user_id;
-        if (save) {
-            try { localStorage.setItem(`pay-settings-${payUserId}`, JSON.stringify(settings)); }
-            catch (error) { /* Storage may be unavailable in private browsing. */ }
-        }
-        const hasWage = document.getElementById('hourlyWage').value !== '';
-        result.innerHTML = `
-            <div class="pay-total"><span>給与の概算</span><strong>${hasWage ? `${data.estimated_yen.toLocaleString('ja-JP')}円` : '時給を入力してください'}</strong></div>
-            <div class="pay-row"><span>シフト</span><strong>${data.shift_count}件</strong></div>
-            <div class="pay-row"><span>予定時間</span><strong>${formatDuration(data.scheduled_minutes)}</strong></div>
-            <div class="pay-row"><span>休憩</span><strong>${formatDuration(data.break_minutes)}</strong></div>
-            <div class="pay-row"><span>実働時間</span><strong>${formatDuration(data.worked_minutes)}</strong></div>
-            <div class="pay-row"><span>深夜時間</span><strong>${formatDuration(data.night_minutes)}</strong></div>`;
-    } catch (error) {
-        if (requestId === payRequest) result.textContent = '計算に失敗しました';
-    }
+    const hasWage = settings.hourly_wage !== '';
+    result.innerHTML = `
+        <div class="pay-total"><span>給与の概算</span><strong>${hasWage ? `${data.estimated_yen.toLocaleString('ja-JP')}円` : '時給を入力してください'}</strong></div>
+        <div class="pay-row"><span>シフト</span><strong>${data.shift_count}件</strong></div>
+        <div class="pay-row"><span>予定時間</span><strong>${formatDuration(data.scheduled_minutes)}</strong></div>
+        <div class="pay-row"><span>休憩</span><strong>${formatDuration(data.break_minutes)}</strong></div>
+        <div class="pay-row"><span>実働時間</span><strong>${formatDuration(data.worked_minutes)}</strong></div>
+        <div class="pay-row"><span>深夜時間</span><strong>${formatDuration(data.night_minutes)}</strong></div>`;
 }
 
 function updatePayMonthDisplay() {
     document.getElementById('mobilePayMonth').textContent = `${currentDate.getFullYear()}年${currentDate.getMonth() + 1}月`;
 }
 
-async function showPayPage() {
+function showPayPage() {
     setActivePage('pay');
     updatePayMonthDisplay();
-    if (payUserId === null) {
-        await fetchPayEstimate(false);
-        if (payUserId === null) return;
-        try {
-            const saved = JSON.parse(localStorage.getItem(`pay-settings-${payUserId}`));
-            if (saved) {
-                document.getElementById('hourlyWage').value = saved.hourly_wage || '';
-                document.getElementById('nightBonus').value = saved.night_bonus_percent ?? 25;
-            }
-        } catch (error) {
-            // Ignore invalid browser settings and keep the visible defaults.
-        }
-    }
     fetchPayEstimate();
 }
 
 document.querySelectorAll('.pay-input').forEach(input => input.addEventListener('input', () => {
+    payRequest++;
+    clearTimeout(visibleRefreshTimer);
     clearTimeout(payTimer);
     payTimer = setTimeout(fetchPayEstimate, 250);
 }));
-
-renderCalendar();
