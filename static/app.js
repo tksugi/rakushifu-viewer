@@ -302,9 +302,9 @@ function setActivePage(page) {
     if (page !== activePage) {
         pageScrollPositions[activePage] = window.scrollY;
         pendingPageScroll = pageScrollPositions[page];
+        clearTimeout(visibleRefreshTimer);
     }
     activePage = page;
-    clearTimeout(visibleRefreshTimer);
     calendarPage.hidden = page !== 'calendar';
     searchPage.hidden = page !== 'search';
     payPage.hidden = page !== 'pay';
@@ -581,25 +581,27 @@ function paySettings() {
 
 async function fetchPayEstimate(save = true) {
     const requestId = ++payRequest;
-    try { await ensureSession(); } catch (error) { return; }
-    if (requestId !== payRequest || sessionEnded) return;
-    const settings = paySettings();
+    let settings;
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth() + 1;
-    if (save) {
-        try { localStorage.setItem(paySettingsKey(), JSON.stringify(settings)); }
-        catch (error) { /* Settings storage is optional. */ }
-    }
-    await loadView(document.getElementById('payResults'), {
-        key: `pay:${year}-${month}:${settings.hourly_wage}:${settings.night_bonus_percent}`,
-        month: `${year}-${month}`, url: '/api/pay/estimate',
-        options: {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ year, month, ...settings, hourly_wage: settings.hourly_wage || '0' }),
-        },
+    await loadView(document.getElementById('payResults'), () => {
+        // Session initialization can restore this user's saved settings.
+        settings = paySettings();
+        if (save && payUserId !== null) {
+            try { localStorage.setItem(paySettingsKey(), JSON.stringify(settings)); }
+            catch (error) { /* Settings storage is optional. */ }
+        }
+        return {
+            key: `pay:${year}-${month}:${settings.hourly_wage}:${settings.night_bonus_percent}`,
+            month: `${year}-${month}`, url: '/api/pay/estimate',
+            options: {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ year, month, ...settings, hourly_wage: settings.hourly_wage || '0' }),
+            },
+        };
     }, data => drawPay(data, settings),
     () => requestId === payRequest && !payPage.hidden
-        && JSON.stringify(paySettings()) === JSON.stringify(settings), '計算中…');
+        && (!settings || JSON.stringify(paySettings()) === JSON.stringify(settings)), '計算中…');
 }
 
 function drawPay(data, settings) {

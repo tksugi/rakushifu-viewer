@@ -229,7 +229,7 @@ APIのエラー形式は[技術仕様](architecture.md#http-api)に、画面上�
 
 ## 検証範囲
 
-ローカル用Python環境で`python -m unittest discover -s tests -v`を実行します。ブラウザのメモリキャッシュの単体テストは、Node.js 22以上で`node --test tests/test_browser_cache.js`を実行できます。追加のnpm依存は不要です。既存CIはPythonのunittestが対象で、JavaScriptの単体テストとブラウザ操作はローカルで別途確認します。
+ローカル用Python環境で`python -m unittest discover -s tests -v`を実行します。ブラウザのメモリキャッシュと画面の自動更新のテストは、Node.js 22以上で`node --test tests/test_browser_cache.js tests/test_view_refresh.js`を実行できます。追加のnpm依存は不要です。既存CIはPythonのunittestが対象で、JavaScriptの単体テストとブラウザ操作はローカルで別途確認します。
 
 | 対象 | 確認状況 |
 | --- | --- |

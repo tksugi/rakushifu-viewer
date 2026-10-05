@@ -145,14 +145,15 @@ function restorePageScroll(target) {
     }
 }
 
-async function loadView(target, descriptor, render, isCurrent, loadingText = '読み込み中…') {
+async function loadView(target, source, render, isCurrent, loadingText = '読み込み中…') {
     if (!isCurrent() || sessionEnded) return;
+    let descriptor = typeof source === 'function' ? source() : source;
     const previous = viewSlots.get(target.id);
     const slot = previous?.descriptor.key === descriptor.key ? previous
         : { descriptor, painted: null, failures: 0, retryAt: 0 };
     slot.descriptor = descriptor;
     slot.isCurrent = isCurrent;
-    slot.refresh = () => loadView(target, descriptor, render, isCurrent, loadingText);
+    slot.refresh = () => loadView(target, source, render, isCurrent, loadingText);
     viewSlots.set(target.id, slot);
     if (!previous || previous.descriptor.key !== descriptor.key) {
         // Do not leave another month/condition visible while awaiting a session check.
@@ -162,6 +163,16 @@ async function loadView(target, descriptor, render, isCurrent, loadingText = '�
     }
     try {
         await ensureSession();
+        if (sessionEnded || viewSlots.get(target.id) !== slot) return;
+        if (typeof source === 'function') {
+            // Build request conditions again after the session restores user settings.
+            const resolved = source();
+            if (resolved.key !== descriptor.key) {
+                return await loadView(target, source, render, isCurrent, loadingText);
+            }
+            descriptor = resolved;
+            slot.descriptor = descriptor;
+        }
         if (!isCurrent() || sessionEnded || viewSlots.get(target.id) !== slot) return;
         const cached = viewCache.peek(descriptor.key);
         if (!cached || previous?.descriptor.key !== descriptor.key) updateStatus(target, '');
