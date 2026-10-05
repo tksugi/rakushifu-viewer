@@ -224,6 +224,7 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='session-events.js') }}"></script>
     <script>
         const form = document.getElementById('loginForm');
         const errorMessage = document.getElementById('errorMessage');
@@ -251,6 +252,7 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    window.shiftSessionEvents.publish();
                     window.location.href = '/';
                 } else {
                     errorText.textContent = data.error || 'ログインに失敗しました';

@@ -1082,3 +1082,13 @@ body {
     font-size: .85rem;
     line-height: 1.6;
 }
+/* Updates retain the current view; private views are concealed during resume checks. */
+.data-update-status {
+    color: var(--text-muted, #667085);
+    font-size: 0.8rem;
+    margin: 0.5rem 0;
+}
+.modal-content > .data-update-status { padding: 0 1.25rem; }
+.session-checking .page-shell,
+.session-checking .floating-nav,
+.session-checking #detailModal { visibility: hidden; }

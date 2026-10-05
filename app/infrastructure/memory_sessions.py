@@ -31,6 +31,7 @@ class MemorySessionStore:
                 _, removed = self._items.pop(oldest)
                 removed.close()
             token = secrets.token_urlsafe(32)
+            value.expires_at = time.time() + self.lifetime_seconds
             self._items[token] = (time.monotonic() + self.lifetime_seconds, value)
             return token
 

@@ -67,7 +67,8 @@ def create_app(config=None, use_cases=None, *, worker_runtime=False) -> Flask:
     app.extensions["shift_use_cases"] = use_cases
     from .application.sample import SampleUseCases
     from .infrastructure.sample_schedule import SampleConnection
-    app.extensions["sample_use_cases"] = SampleUseCases(SampleConnection)
+    app.extensions["sample_use_cases"] = SampleUseCases(
+        SampleConnection, cache_seconds=app.config["CACHE_SECONDS"])
     if settings.environment == "test":
         from .infrastructure.login_limiter import MemoryLoginLimiter
         app.extensions["login_limiter"] = MemoryLoginLimiter()
