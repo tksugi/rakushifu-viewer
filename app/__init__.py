@@ -6,7 +6,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 from .application.use_cases import ShiftUseCases
 from .settings import AppSettings, MAX_REQUEST_BODY_BYTES
-from .web.routes import routes
+from .web.routes import routes, sample
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -65,6 +65,9 @@ def create_app(config=None, use_cases=None, *, worker_runtime=False) -> Flask:
             max_cached_months=app.config["MAX_CACHED_MONTHS"],
         )
     app.extensions["shift_use_cases"] = use_cases
+    from .application.sample import SampleUseCases
+    from .infrastructure.sample_schedule import SampleConnection
+    app.extensions["sample_use_cases"] = SampleUseCases(SampleConnection)
     if settings.environment == "test":
         from .infrastructure.login_limiter import MemoryLoginLimiter
         app.extensions["login_limiter"] = MemoryLoginLimiter()
@@ -82,4 +85,5 @@ def create_app(config=None, use_cases=None, *, worker_runtime=False) -> Flask:
             return Response(run_sync(asset.bytes()), status=asset.status,
                             headers=asset.headers)
     app.register_blueprint(routes)
+    app.register_blueprint(sample)
     return app

@@ -14,20 +14,29 @@ from app.application.errors import (
 
 
 routes = Blueprint("routes", __name__)
+sample = Blueprint("sample", __name__, url_prefix="/sample")
+
+
+def _is_sample():
+    return request.blueprint == "sample"
 
 
 def _use_cases():
+    if _is_sample():
+        return current_app.extensions["sample_use_cases"]
     return current_app.extensions["shift_use_cases"]
 
 
 def _token() -> str:
+    if _is_sample():
+        return ""
     return request.cookies.get(current_app.config["APP_COOKIE_NAME"], "")
 
 
 def _login_required(function):
     @wraps(function)
     def decorated(*args, **kwargs):
-        if not _use_cases().authenticated(_token()):
+        if not _is_sample() and not _use_cases().authenticated(_token()):
             if request.path.startswith("/api/"):
                 return jsonify({"error": "ログインが必要です"}), 401
             return redirect(url_for("routes.login_page"))
@@ -47,7 +56,8 @@ def _year_month():
 
 @routes.after_request
 def prevent_shift_cache(response):
-    if request.path.startswith("/api/") or request.path == "/login":
+    if (request.path.startswith(("/api/", "/sample/api/"))
+            or request.path in ("/login", "/sample")):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -201,3 +211,17 @@ def pay_estimate():
     except (KeyError, ValueError, TypeError, InvalidOperation):
         return jsonify({"error": "給与設定を確認してください"}), 400
     return jsonify(_use_cases().my_pay(year, month, _token(), wage, bonus))
+
+
+@sample.get("")
+def sample_index():
+    return render_template("index.html", sample_mode=True)
+
+
+# Public endpoints share the existing input validation and response semantics.
+sample.add_url_rule("/api/calendar", view_func=calendar_data)
+sample.add_url_rule("/api/shifts", view_func=shifts_by_date)
+sample.add_url_rule("/api/staff", view_func=search_staff)
+sample.add_url_rule("/api/staff/<int:user_id>", view_func=staff_detail)
+sample.add_url_rule("/api/pay/estimate", view_func=pay_estimate, methods=["POST"])
+sample.after_request(prevent_shift_cache)
