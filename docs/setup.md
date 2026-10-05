@@ -252,3 +252,11 @@ Windowsで起動手順を確認しています。macOS / Linuxのコマンドは
 | Durable Object | セッションなどの状態とストレージをObject単位で管理するWorkersの仕組み |
 
 [READMEに戻る](../README.md)
+
+## リリース時のマージ方法
+
+通常の作業PRはdevへsquash mergeし、リリースはdevからmainへmerge commitで取り込みます。GitHubのmain-protectionはmerge commitだけを許可し、hotfixも同じ方法で取り込みます。dev-protectionはsquash mergeだけを許可します。
+
+リリースをsquashすると、同じ内容が両ブランチにあっても履歴がつながらず、次回のリリースで競合する場合があります。リリース前には両ブランチの履歴、差分、対象コミットのCIを確認してください。mainへのマージはテスト成功後の自動デプロイを伴うため、明示的なリリース承認を受けてから実行します。
+
+過去のsquashによる履歴の分断を復旧する場合は、最新devから専用ブランチを作り、mainをmergeして両側の変更を確認・競合解消します。そのブランチからmain向けPRを作り、merge commitで取り込むと、devの履歴を保ったまま再接続できます。通常のリリースはdevからmainへのPRに戻します。競合が起きない保証ではなく、同じ変更の重複取り込みによる競合を防ぐ手順です。

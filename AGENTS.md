@@ -67,7 +67,7 @@ mainへの直接pushは禁止する。hotfixでもこの禁止は変わらない
 
 リリースを依頼されたときにdevからmain向けPRを作成する。通常の変更の依頼だけで、リリースPRや本番反映まで進めない。
 
-devからmainへの取り込みは**merge commit**とし、両ブランチの履歴をつなぐ。squashやrebaseで代用しない。リリースPRでは、含まれる変更、CI結果、未検証範囲、本番への影響、特別な反映・復旧手順を確認する。
+devからmainへの取り込みは**merge commit**とし、両ブランチの履歴をつなぐ。 GitHubのmain-protection rulesetもmerge commitだけを許可する。通常のdev向けPRは引き続きsquash mergeとする。squashやrebaseで代用しない。リリースPRでは、含まれる変更、CI結果、未検証範囲、本番への影響、特別な反映・復旧手順を確認する。
 
 ### 3.4 hotfixとdevへの反映
 
@@ -75,8 +75,8 @@ hotfixは、緊急の本番修正でdevを経由しないための例外であ�
 
 1. 最新のmainからhotfixブランチを作る。未リリースのdev全体を混ぜない。
 2. 修正と回帰テストを用意し、main向けPRを作る。
-3. mainへの取り込みはsquash mergeとする。ユーザーのマージ後に、実際に取り込まれたコミットを確認する。
-4. 修正をdevへ戻すためのPRを作る。mainにhotfix以外の差分があるか確認し、必要な修正だけを含める。最新devからブランチを作り、mainのhotfixコミットをcherry-pickする方法を使える。
+3. mainへの取り込みはmerge commitとする。main向けPRはGitHubのrulesetでもmerge commitだけを許可する。ユーザーのマージ後に、実際に取り込まれたhotfixの変更を確認する。
+4. 修正をdevへ戻すためのPRを作る。mainにhotfix以外の差分があるか確認し、必要な修正だけを含める。最新devからブランチを作り、hotfixブランチの修正コミットをcherry-pickする方法を使える。merge commit自体をそのままcherry-pickせず、必要な修正だけを選ぶ。
 5. devへの反映でも検証を行う。競合を解決する際に、修正の目的やdevの新機能を消さない。
 
 main向けPR作成時点では、mainへのマージ待ちであり、マージ後にdevへ修正を取り込む必要があることを報告する。main・devそれぞれの反映状況を区別し、マージの事実を確認せずに反映済みと報告しない。
@@ -85,7 +85,7 @@ main向けPR作成時点では、mainへのマージ待ちであり、マージ�
 
 共有ブランチのrebase、force push、履歴削除は、ユーザーの明示的な依頼なしに行わない。競合は両側の目的を読み、解決後に関係する検証を再実行する。片側を丸ごと採用して意味を失わせない。
 
-マージ方法やブランチ保護がGitHubに設定されているとは仮定しない。設定が方針と一致しない場合は報告し、設定の変更を今回の作業に無断で含めない。
+リリースPR作成時は、main-protectionがmerge commitだけ、dev-protectionがsquash mergeだけを許可しているかAPIまたは設定画面で確認する。設定が方針と一致しない場合は報告し、設定の変更を今回の作業に無断で含めない。
 
 ## 4. コミットとPRの表記を統一する
 
