@@ -8,6 +8,7 @@ from app.domain.services import estimate_pay, overlaps
 from .errors import SessionExpired, StaffNotFound
 from .ports import Authenticator, SessionStore
 from .session import ActiveSession
+from .cache import cache_metadata, observe_month
 
 
 def _store_shifts(month: ShiftMonth, viewer: Viewer) -> List[Shift]:
@@ -44,6 +45,7 @@ class ShiftUseCases:
             active = ActiveSession(viewer=viewer, connection=connection)
             active.cache[(today.year, today.month)] = (
                 time.monotonic() + self.cache_seconds, month)
+            active.month_metadata[(today.year, today.month)] = cache_metadata(self.cache_seconds)
             return self.sessions.create(active)
         except Exception:
             connection.close()
@@ -61,22 +63,37 @@ class ShiftUseCases:
     def authenticated(self, token: str) -> bool:
         return self.sessions.get(token) is not None if token else False
 
+    def session_info(self, token: str) -> dict:
+        active = self._active(token)
+        return {"scope": active.cache_scope, "user_id": active.viewer.staff_id,
+                "expires_in": max(0, active.expires_at - time.time())}
+
     def _month(self, active: ActiveSession, year: int, month: int) -> ShiftMonth:
         key = (year, month)
         with active.lock:
+            if active.closed or (active.expires_at and active.expires_at <= time.time()):
+                raise SessionExpired("ログインが必要です")
             cached = active.cache.get(key)
             if cached and cached[0] > time.monotonic():
+                observe_month(active, active.month_metadata[key])
                 return cached[1]
             result = active.connection.fetch(
                 year, month, active.viewer.store_id, active.viewer.genre_id)
+            if active.closed or (active.expires_at and active.expires_at <= time.time()):
+                raise SessionExpired("ログインが必要です")
             now = time.monotonic()
             for old_key, (expires, _) in list(active.cache.items()):
                 if expires <= now:
                     del active.cache[old_key]
+                    active.month_metadata.pop(old_key, None)
             if key not in active.cache and len(active.cache) >= self.max_cached_months:
                 oldest = min(active.cache, key=lambda item: active.cache[item][0])
                 del active.cache[oldest]
+                active.month_metadata.pop(oldest, None)
             active.cache[key] = (now + self.cache_seconds, result)
+            metadata = getattr(active.connection, "cache_metadata", None)
+            active.month_metadata[key] = metadata or cache_metadata(self.cache_seconds)
+            observe_month(active, active.month_metadata[key])
             return result
 
     def day(self, target: date, token: str) -> dict:

@@ -2,6 +2,7 @@ import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from functools import wraps
+import time
 
 from flask import (Blueprint, current_app, jsonify, redirect, render_template,
                    request, url_for)
@@ -11,6 +12,7 @@ from app.application.errors import (
     InvalidScheduleData, SessionExpired, StaffNotFound, StorageUnavailable,
     UpstreamError,
 )
+from app.application.cache import capture_month
 
 
 routes = Blueprint("routes", __name__)
@@ -54,10 +56,25 @@ def _year_month():
         raise ValueError("year and month parameters are required")
 
 
+def _cache_observed(function):
+    @wraps(function)
+    def decorated(*args, **kwargs):
+        with capture_month() as metadata:
+            response = current_app.make_response(function(*args, **kwargs))
+        if metadata:
+            response.headers["X-Shift-Fetched-At"] = str(metadata["fetched_at"])
+            response.headers["X-Shift-Remaining-Seconds"] = str(
+                max(0, metadata["expires_at"] - time.time()))
+            response.headers["X-Shift-Revision"] = metadata["revision"]
+            response.headers["X-App-Scope"] = metadata["scope"]
+        return response
+    return decorated
+
+
 @routes.after_request
 def prevent_shift_cache(response):
     if (request.path.startswith(("/api/", "/sample/api/"))
-            or request.path in ("/login", "/sample")):
+            or request.path in ("/", "/login", "/sample")):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -144,6 +161,7 @@ def index():
 
 @routes.get("/api/shifts")
 @_login_required
+@_cache_observed
 def shifts_by_date():
     value = request.args.get("date", "")
     if not value:
@@ -159,6 +177,7 @@ def shifts_by_date():
 
 @routes.get("/api/calendar")
 @_login_required
+@_cache_observed
 def calendar_data():
     try:
         year, month = _year_month()
@@ -169,6 +188,7 @@ def calendar_data():
 
 @routes.get("/api/staff/<int:user_id>")
 @_login_required
+@_cache_observed
 def staff_detail(user_id):
     try:
         year, month = _year_month()
@@ -182,6 +202,7 @@ def staff_detail(user_id):
 
 @routes.get("/api/staff")
 @_login_required
+@_cache_observed
 def search_staff():
     try:
         year, month = _year_month()
@@ -195,6 +216,7 @@ def search_staff():
 
 @routes.post("/api/pay/estimate")
 @_login_required
+@_cache_observed
 def pay_estimate():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
@@ -218,8 +240,15 @@ def sample_index():
     return render_template("index.html", sample_mode=True)
 
 
+@routes.get("/api/session")
+@_login_required
+def session_status():
+    return jsonify(_use_cases().session_info(_token()))
+
+
 # Public endpoints share the existing input validation and response semantics.
 sample.add_url_rule("/api/calendar", view_func=calendar_data)
+sample.add_url_rule("/api/session", view_func=session_status)
 sample.add_url_rule("/api/shifts", view_func=shifts_by_date)
 sample.add_url_rule("/api/staff", view_func=search_staff)
 sample.add_url_rule("/api/staff/<int:user_id>", view_func=staff_detail)

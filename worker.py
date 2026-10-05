@@ -1,6 +1,7 @@
 """Production Python Worker. `python api.py` continues to run test mode locally."""
 
 import json
+import asyncio
 import time
 from copy import deepcopy
 
@@ -8,6 +9,7 @@ from workers import DurableObject, wsgi
 
 from app import create_app
 from app.application.errors import CredentialsUnavailable, InvalidScheduleData, UpstreamError
+from app.application.cache import cache_metadata
 from app.infrastructure.worker_http import WorkerRakushifuConnection
 from app.infrastructure.worker_state import month_to_json
 from app.settings import MAX_REQUEST_BODY_BYTES
@@ -20,9 +22,10 @@ class SessionObject(DurableObject):
         self.cache_seconds = 120
         self.max_cached_months = 3
         self.generation = 0
+        self.pending = {}
 
     async def create(self, state_json, month_json, key_json,
-                     cache_seconds, max_cached_months):
+                     cache_seconds, max_cached_months, initial_metadata_json="null"):
         if await self.ctx.storage.get("session") is not None:
             raise RuntimeError("session already exists")
         self.generation += 1
@@ -37,7 +40,8 @@ class SessionObject(DurableObject):
             int(state["expires_at"] * 1000))
         key = json.loads(key_json)
         if month_json and len(key) == 2:
-            self.cache[tuple(key)] = (time.time() + self.cache_seconds, month_json)
+            metadata = json.loads(initial_metadata_json) or cache_metadata(self.cache_seconds)
+            self.cache[tuple(key)] = (metadata["expires_at"], month_json, metadata)
 
     async def read(self):
         state_json = await self.ctx.storage.get("session")
@@ -49,6 +53,19 @@ class SessionObject(DurableObject):
         return state_json
 
     async def month(self, year, month):
+        key = (int(year), int(month))
+        # Different view APIs can ask for the same month during an upstream fetch.
+        task = self.pending.get(key)
+        if task is None:
+            task = asyncio.create_task(self._load_month(*key))
+            self.pending[key] = task
+        try:
+            return await asyncio.shield(task)
+        finally:
+            if task.done() and self.pending.get(key) is task:
+                del self.pending[key]
+
+    async def _load_month(self, year, month):
         state_json = await self.read()
         if state_json is None:
             return json.dumps({"error": "expired"})
@@ -58,7 +75,8 @@ class SessionObject(DurableObject):
         key = (int(year), int(month))
         cached = self.cache.get(key)
         if cached and cached[0] > time.time():
-            return json.dumps({"error": "ok", "month": cached[1]})
+            return json.dumps({"error": "ok", "month": cached[1],
+                               "cache_metadata": cached[2]})
         connection = WorkerRakushifuConnection.from_state(state)
         viewer = connection.viewer
         generation = self.generation
@@ -88,8 +106,10 @@ class SessionObject(DurableObject):
             oldest = min(self.cache, key=lambda item: self.cache[item][0])
             del self.cache[oldest]
         serialized = month_to_json(result)
-        self.cache[key] = (now + self.cache_seconds, serialized)
-        return json.dumps({"error": "ok", "month": serialized})
+        metadata = cache_metadata(self.cache_seconds)
+        self.cache[key] = (metadata["expires_at"], serialized, metadata)
+        return json.dumps({"error": "ok", "month": serialized,
+                           "cache_metadata": metadata})
 
     async def remove(self):
         self.generation += 1
