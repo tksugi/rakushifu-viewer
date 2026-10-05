@@ -42,7 +42,7 @@ function setModalView(view) {
 }
 
 async function authenticatedFetch(url, options) {
-    const response = await fetch(url, options);
+    const response = await fetch(`${document.body.dataset.apiPrefix || ''}${url}`, options);
     if (response.status === 401) {
         window.location.href = '/login';
         throw new Error('Login required');
@@ -567,6 +567,10 @@ document.getElementById('staffSearchInput').addEventListener('input', () => {
     searchTimer = setTimeout(searchStaff, 250);
 });
 let payUserId = null;
+
+function paySettingsKey() {
+    return `${document.body.dataset.apiPrefix ? 'sample-' : ''}pay-settings-${payUserId}`;
+}
 let payRequest = 0;
 let payTimer;
 
@@ -599,7 +603,7 @@ async function fetchPayEstimate(save = true) {
         }
         payUserId = data.user_id;
         if (save) {
-            try { localStorage.setItem(`pay-settings-${payUserId}`, JSON.stringify(settings)); }
+            try { localStorage.setItem(paySettingsKey(), JSON.stringify(settings)); }
             catch (error) { /* Storage may be unavailable in private browsing. */ }
         }
         const hasWage = document.getElementById('hourlyWage').value !== '';
@@ -626,7 +630,7 @@ async function showPayPage() {
         await fetchPayEstimate(false);
         if (payUserId === null) return;
         try {
-            const saved = JSON.parse(localStorage.getItem(`pay-settings-${payUserId}`));
+            const saved = JSON.parse(localStorage.getItem(paySettingsKey()));
             if (saved) {
                 document.getElementById('hourlyWage').value = saved.hourly_wage || '';
                 document.getElementById('nightBonus').value = saved.night_bonus_percent ?? 25;

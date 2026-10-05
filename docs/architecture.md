@@ -31,6 +31,16 @@ Flaskの画面・APIと、シフト・給与の計算を共通に使い、外部
 
 ## ログインとらくしふ通信
 
+### サンプル表示の分離
+
+`GET /sample`はログイン不要のサンプル画面です。画面からの参照・給与計算は`/sample/api/calendar`、`/sample/api/shifts`、`/sample/api/staff`、`/sample/api/staff/<user_id>`、`/sample/api/pay/estimate`を使います。入力条件、HTTPメソッド、JSONの項目と計算方法は通常のAPIと共通です。通常の`/api/*`は引き続き認証が必要です。
+
+サンプル専用Blueprintは`SampleUseCases`と`SampleConnection`を使い、リクエストごとに架空データだけを生成します。認証Cookie、通常のセッション、Durable Objects、実データのキャッシュや外部通信を参照せず、アプリCookieも発行・削除しません。Flask・Workersともに同じ実装を使います。画面とAPIの応答には`Cache-Control: no-store`を付けます。Bootstrapやフォントの取得は通常画面と共通です。
+
+給与設定の保存キーはサンプルでは`sample-pay-settings-<user_id>`、通常利用では従来の`pay-settings-<user_id>`です。サンプルを終了しても通常のセッションは削除しません。
+
+### 通常のログイン
+
 ログインは次の順に処理します。ローカル版とWorkers版で、参照先と取得内容は共通です。
 
 1. `POST /login`でJSONの従業員ID・パスワードを受け取り、入力と試行回数を検証する。
