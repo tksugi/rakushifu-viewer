@@ -51,14 +51,33 @@ class SampleDisplayTests(unittest.TestCase):
             with self.subTest(year=year, month=month):
                 data = SampleConnection().fetch(year, month, SAMPLE_VIEWER.store_id, 1)
                 self.assertEqual(list(data.staff), list(range(SAMPLE_FIRST_ID, SAMPLE_FIRST_ID + SAMPLE_STAFF_COUNT)))
-                self.assertGreater(len(data.shifts), 1100)
+                self.assertGreater(len(data.shifts), 800)
                 self.assertEqual({shift.date.day for shift in data.shifts}, set(range(1, monthrange(year, month)[1] + 1)))
                 for user_id, staff in data.staff.items():
                     self.assertEqual(staff.employee_code, str(user_id))
                     self.assertIn("架空", staff.name)
                     self.assertIsNotNone(staff.birthday)
-                    self.assertGreaterEqual(sum(s.user_id == user_id for s in data.shifts), 20)
-                self.assertTrue(any(s.end.hour > 24 for s in data.shifts))
+                    personal = [s for s in data.shifts if s.user_id == user_id]
+                    self.assertGreaterEqual(len(personal), 10)
+                    self.assertGreater(len({(s.start, s.end) for s in personal}), 5)
+                    self.assertGreater(len({s.date.weekday() for s in personal}), 3)
+                    full_weeks = {}
+                    for shift in personal:
+                        week_start = shift.date.day - shift.date.weekday()
+                        if 1 <= week_start <= monthrange(year, month)[1] - 6:
+                            full_weeks.setdefault(week_start, set()).add(shift.date.weekday())
+                    self.assertTrue(all(3 <= len(days) <= 6 for days in full_weeks.values()))
+                    self.assertGreater(len({tuple(sorted(days)) for days in full_weeks.values()}), 1)
+                self.assertTrue(all(6 * 60 <= s.start.minutes < s.end.minutes <= 24 * 60
+                                    for s in data.shifts))
+                self.assertTrue(any(s.end.minutes == 24 * 60 for s in data.shifts))
+                self.assertGreater(len({s.start for s in data.shifts}), 20)
+                self.assertGreater(len({s.end for s in data.shifts}), 20)
+                self.assertGreater(len({s.work_minutes for s in data.shifts}), 10)
+                self.assertTrue(all(s.duration_minutes <= 8 * 60 and s.work_minutes > 0
+                                    for s in data.shifts))
+                self.assertTrue(all(s.start.minutes <= start.minutes < end.minutes <= s.end.minutes
+                                    for s in data.shifts for start, end in s.rests))
                 self.assertTrue(any(len(s.rests) > 1 for s in data.shifts))
                 self.assertTrue(any(not s.rests for s in data.shifts))
                 self.assertEqual(data, SampleConnection().fetch(year, month, SAMPLE_VIEWER.store_id, 1))
@@ -67,8 +86,9 @@ class SampleDisplayTests(unittest.TestCase):
         calendar = self.sample_get("calendar?year=2026&month=10")
         self.assertEqual(len(calendar), 31)
         self.assertTrue(any(not day["has_me"] for day in calendar.values()))
-        day = self.sample_get("shifts?date=2026-10-01")
-        self.assertEqual(day["count"], calendar["2026-10-01"]["total_count"])
+        my_day = next(key for key, value in calendar.items() if value["has_me"])
+        day = self.sample_get(f"shifts?date={my_day}")
+        self.assertEqual(day["count"], calendar[my_day]["total_count"])
         self.assertTrue(day["has_my_shift"])
         self.assertTrue(any(w["is_overlapping"] for w in day["workers"]))
         self.assertTrue(any(w["is_same_end"] for w in day["workers"]))
@@ -82,7 +102,7 @@ class SampleDisplayTests(unittest.TestCase):
         self.assertTrue(matches)
         for user_id in (SAMPLE_FIRST_ID, SAMPLE_FIRST_ID + 59):
             detail = self.sample_get(f"staff/{user_id}?year=2026&month=10")
-            self.assertGreater(len(detail["schedules"]), 20)
+            self.assertGreaterEqual(len(detail["schedules"]), 10)
             self.assertEqual(detail["total_work_minutes"], sum(s["duration_minutes"] for s in detail["schedules"]))
         response = self.client.post("/sample/api/pay/estimate", json={
             "year": 2026, "month": 10, "hourly_wage": 1200, "night_bonus_percent": 25,
