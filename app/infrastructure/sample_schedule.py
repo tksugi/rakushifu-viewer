@@ -57,7 +57,7 @@ class SampleConnection:
             staff[user_id] = Staff(
                 id=user_id,
                 name=f"{SURNAMES[index % 10]} {GIVEN_NAMES[index // 10]}（架空）",
-                age=max(0, age), rank=("リーダー", "ホール", "キッチン")[index % 3],
+                age=max(0, age),
                 birthday=f"{birth_year}-{birth_month:02d}-{birth_day:02d}",
                 employee_code=str(user_id), belonging_store_id=SAMPLE_STORE_ID,
             )
