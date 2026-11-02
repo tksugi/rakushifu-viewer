@@ -28,8 +28,9 @@ class StorageModeTests(unittest.TestCase):
                 )
                 response = app.test_client().get("/")
                 self.assertEqual(response.status_code, 200)
-                self.assertIn(b'href="/static/style.css"', response.data)
-                self.assertIn(b'src="/static/app.js"', response.data)
+                self.assertIn(b'href="/static/react/style.css"', response.data)
+                self.assertIn(b'src="/static/react/app.js"', response.data)
+                self.assertIn(b'type="module"', response.data)
 
     def test_storage_failure_returns_503_instead_of_login_expired(self):
         class BrokenUseCases:

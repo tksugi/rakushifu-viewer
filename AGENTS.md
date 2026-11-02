@@ -169,7 +169,8 @@ PR本文は日本語を基本とし、次を記載する。既存のテンプレ
 | `app/application/` | ユースケース、認証状態、月別キャッシュ、外部依存のポート |
 | `app/infrastructure/` | 外部通信、JSON変換、環境別のセッション保存 |
 | `app/web/` | HTTP入力の検証、認証判定、Cookie、画面・API応答 |
-| `templates/`、`static/` | HTML、CSS、JavaScript |
+| `frontend/` | React画面、Arcコンポーネント、TanStack Queryとの接続 |
+| `templates/`、`static/` | 起動HTML、キャッシュ基盤、ビルド済みCSS・JavaScript |
 | `api.py` | ローカルFlaskの入口 |
 | `worker.py` | WorkersとDurable Objectsの入口 |
 | `scripts/prepare_worker.py` | Workers用の配布ファイルの準備 |
@@ -213,6 +214,8 @@ python -m unittest discover -s tests -v
 
 テストは人工データと代替実装を使い、実アカウントや本番通信を必要としない。テスト全件の成功だけで、ブラウザ・実接続・Workersランタイムまで検証済みとは扱わない。
 
+React・TypeScript・依存・画面ビルドを変更した場合は、Node.js 22.12以上のLTS版で`npm ci`・`npm test`・`npm run build`も実行する。`npm test`は既存キャッシュとReactの架空データによる回帰テスト、`npm run build`は型検査と配信用ファイルの生成を行う。`static/react/`は生成物のため直接編集・コミットしない。
+
 ### 7.2 変更の種類ごとに確認を追加する
 
 | 変更 | 追加する検証 |
@@ -239,6 +242,7 @@ Workers用の準備は次の手順で行う。必要なNode.js・Python・uvの�
 
 ```sh
 npm ci
+npm run build
 python scripts/prepare_worker.py
 ```
 
@@ -279,7 +283,7 @@ python scripts/prepare_worker.py
 
 ### 8.2 CIの現在の制約
 
-現状の[CI](.github/workflows/ci-deploy.yml)は、main・dev向けPR、main・devへのpush、手動実行を対象とする。devへのpushとPRではテストのみを実行し、デプロイはmainへのpushまたはmainの手動実行でテストに成功した場合だけ行う。テストはPython 3.10のローカル用unittestであり、WorkersのPython 3.14での動作やブラウザ操作をすべて検証するものではない。
+現状の[CI](.github/workflows/ci-deploy.yml)は、main・dev向けPR、main・devへのpush、手動実行を対象とする。devへのpushとPRではテストのみを実行し、デプロイはmainへのpushまたはmainの手動実行でテストに成功した場合だけ行う。テストはPython 3.10のローカル用unittestに加え、Node.js 22でフロントのテスト・型検査・ビルドとWorkers配布準備を確認する。WorkersのPython 3.14での実行やブラウザ操作をすべて検証するものではない。
 
 dev向けPRでも、対象コミットの「ローカルテスト」のCI結果を確認する。CI追加前のコミットや設定を含まないブランチなど、dev向けCIが動かない場合はローカルの必須検証結果と「dev向けCI未実行」を明記し、CI成功として扱わない。
 
@@ -308,7 +312,7 @@ mainへのpushとmainの手動ワークフロー実行は、現行CIのテスト
 
 lockファイルを理由なく削除・全面更新しない。生成ツールを使って更新し、意図しない依存の変更を確認する。設定ファイル、CI、lockに矛盾するバージョンを文書だけで指示しない。
 
-`node_modules/`、`python_modules/`、`.worker-build/`、仮想環境、キャッシュ、ローカル状態、ログはコミットしない。ビルドへコピーするファイルを増やす場合は、ソースのみを配布する既存の方針を保ち、実データや秘密が混ざらないか確認する。
+`node_modules/`、`python_modules/`、`.worker-build/`、仮想環境、`static/react/`、キャッシュ、ローカル状態、ログはコミットしない。ビルドへコピーするファイルを増やす場合は、ソースのみを配布する既存の方針を保ち、実データや秘密が混ざらないか確認する。
 
 実装を変更してREADME・docs・この文書の記載が古くなる場合は、関連箇所を更新する。
 

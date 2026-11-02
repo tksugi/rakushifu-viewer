@@ -10,6 +10,9 @@ SOURCE = TARGET / "src"
 
 
 def main():
+    if not all((ROOT / "static" / "react" / name).is_file()
+               for name in ("app.js", "style.css")):
+        raise RuntimeError("Run npm ci and npm run build before preparing the Worker")
     if TARGET.parent != ROOT.resolve():
         raise RuntimeError("Worker build directory must stay inside the workspace")
     if TARGET.exists():
