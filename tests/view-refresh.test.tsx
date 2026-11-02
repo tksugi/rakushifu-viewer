@@ -21,7 +21,8 @@ function fixture(initialSessionStatus = 200, prefix = '') {
   const fetcher = vi.fn(async (url: RequestInfo | URL, options?: RequestInit) => {
     requests.push({ url: String(url), options });
     const session = String(url).endsWith('/api/session');
-    const status = session ? state.sessionStatus : state.status;
+    const refresh = String(url).endsWith('/api/auth/refresh');
+    const status = (session || refresh) ? state.sessionStatus : state.status;
     const data = session ? { scope: state.scope, user_id: 1, expires_in: state.expires } : String(url).includes('/staff') ? [] : String(url).includes('/shifts') ? { workers: [], has_my_shift: false, count: 0 } : pay;
     return new Response(JSON.stringify(status >= 400 ? { error: '架空の通信エラー' } : data), { status, headers: { 'Content-Type': 'application/json', 'X-App-Scope': state.scope, 'X-Shift-Revision': state.revision, 'X-Shift-Fetched-At': String(state.fetched), 'X-Shift-Remaining-Seconds': String(state.remaining) } });
   });
@@ -46,6 +47,68 @@ beforeEach(() => {
 afterEach(() => { cleanup(); instances.splice(0).forEach(app => app.end(false)); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('React refresh and cache integration', () => {
+  it('shares one refresh across concurrent expired access requests and retries each once', async () => {
+    const f = fixture(); await f.app.ensureSession();
+    let refreshed = false;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    f.fetcher.mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/auth/refresh')) {
+        await gate; refreshed = true;
+        return new Response('{}', { status: 200 });
+      }
+      return new Response(JSON.stringify(pay), { status: refreshed ? 200 : 401 });
+    });
+    const pending = Promise.all([
+      f.app.client.fetchQuery(f.app.options(calendarDescriptor(month))),
+      f.app.client.fetchQuery(f.app.options(searchDescriptor(month, ''))),
+    ]);
+    await advance();
+    expect(f.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/api/auth/refresh'))).toHaveLength(1);
+    release(); await pending;
+    expect(f.app.ended).toBe(false);
+    expect(f.fetcher.mock.calls.filter(([url]) => String(url).includes('/api/calendar'))).toHaveLength(2);
+  });
+  it('does not restore the session or retry data after logout during refresh', async () => {
+    const f = fixture(); await f.app.ensureSession();
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    f.fetcher.mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/auth/refresh')) { await gate; return new Response('{}'); }
+      return new Response('{}', { status: 401 });
+    });
+    const pending = f.app.client.fetchQuery(f.app.options(calendarDescriptor(month))).catch(error => error);
+    await advance(); f.app.end(false); release(); await pending;
+    expect(f.app.info).toBeNull();
+    expect(f.app.cache.entries.size).toBe(0);
+    expect(f.fetcher.mock.calls.filter(([url]) => String(url).includes('/api/calendar'))).toHaveLength(1);
+    const refreshRequest = f.fetcher.mock.calls.find(([url]) => String(url).endsWith('/api/auth/refresh'));
+    expect(refreshRequest?.[1]?.signal?.aborted).toBe(true);
+  });
+  it('keeps a session on transient refresh failure and can recover on the next check', async () => {
+    const f = fixture();
+    let transient = true;
+    f.fetcher.mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/auth/refresh')) {
+        return new Response('{}', { status: transient ? 503 : 200 });
+      }
+      return new Response(JSON.stringify({ scope: 'synthetic-session', user_id: 1, expires_in: 2592000 }), { status: transient ? 401 : 200 });
+    });
+    await expect(f.app.ensureSession()).rejects.toThrow('更新');
+    expect(f.app.ended).toBe(false);
+    transient = false; await f.app.ensureSession();
+    expect(f.app.info?.scope).toBe('synthetic-session');
+  });
+  it('ends the session if the retried API still rejects authentication without a refresh loop', async () => {
+    const f = fixture();
+    f.fetcher.mockImplementation(async url => new Response('{}', {
+      status: String(url).endsWith('/api/auth/refresh') ? 200 : 401,
+    }));
+    await expect(f.app.ensureSession()).rejects.toThrow('ログイン');
+    expect(f.app.ended).toBe(true);
+    expect(f.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/api/auth/refresh'))).toHaveLength(1);
+    expect(f.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/api/session'))).toHaveLength(2);
+  });
   it('keeps a 30-day session past the browser timer limit and clears it at the fixed deadline', async () => {
     const f = fixture();
     const lifetime = 30 * 24 * 60 * 60 * 1000;

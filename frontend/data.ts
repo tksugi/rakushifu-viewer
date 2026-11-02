@@ -52,6 +52,8 @@ export class AppData {
   private check: Promise<Session> | null = null;
   private sessionController: AbortController | null = null;
   private expiryTimer: ReturnType<typeof setTimeout> | undefined;
+  private refresh: Promise<void> | null = null;
+  private refreshController: AbortController | null = null;
   constructor(readonly prefix: string, private onEnd: (redirect: boolean) => void, private fetcher: typeof fetch = (...args) => fetch(...args)) {
     this.cache = new globalThis.ViewDataCache((url, options) => this.request(url, options), { onSessionChanged: () => this.end() });
     this.client.getQueryCache().subscribe(event => {
@@ -60,9 +62,30 @@ export class AppData {
   }
   private async request(url: string, options?: RequestInit) {
     if (this.ended || Date.now() >= this.deadline) { this.end(); throw new ApiError('ログインの有効期限が切れました', 401); }
-    const response = await this.fetcher(this.prefix + url, { ...options, cache: 'no-store', credentials: 'same-origin' });
+    let response = await this.fetcher(this.prefix + url, { ...options, cache: 'no-store', credentials: 'same-origin' });
+    if (response.status === 401 && !this.prefix && !this.ended) {
+      await this.refreshAccess();
+      if (this.ended) throw new ApiError('Session ended');
+      response = await this.fetcher(url, { ...options, cache: 'no-store', credentials: 'same-origin' });
+    }
     if (response.status === 401) { this.end(); throw new ApiError('ログインが必要です', 401); }
     return response;
+  }
+  private async refreshAccess() {
+    if (this.refresh) return this.refresh;
+    this.refreshController = new AbortController();
+    this.refresh = (async () => {
+      const response = await this.fetcher('/api/auth/refresh', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        credentials: 'same-origin', cache: 'no-store', signal: this.refreshController!.signal,
+      });
+      if (this.ended) throw new ApiError('Session ended');
+      if (!response.ok) {
+        if ([400, 401, 403].includes(response.status)) this.end();
+        throw new ApiError('ログイン状態を更新できませんでした', response.status);
+      }
+    })();
+    try { await this.refresh; } finally { this.refresh = null; }
   }
   async ensureSession(force = false): Promise<Session> {
     if (this.ended || Date.now() >= this.deadline) { this.end(); throw new ApiError('ログインの有効期限が切れました', 401); }
@@ -100,6 +123,7 @@ export class AppData {
     this.ended = true;
     clearTimeout(this.expiryTimer);
     this.sessionController?.abort();
+    this.refreshController?.abort();
     this.cache.clear();
     this.failures.clear();
     this.client.clear();

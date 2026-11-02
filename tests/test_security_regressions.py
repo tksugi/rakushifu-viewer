@@ -168,6 +168,7 @@ class SecurityRegressionTests(unittest.TestCase):
     def test_flask_accepts_normal_login_and_bounds_unknown_length_streams(self):
         use_cases = Mock()
         use_cases.login.return_value = "a" * 43
+        use_cases.token_context.return_value = ("synthetic-key" * 6, 2000000000)
         app = create_app({"TESTING": True}, use_cases)
         response = app.test_client().post("/login", json={
             "employee_code": "DEMO", "password": "test-password"})
