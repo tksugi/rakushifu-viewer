@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { AppData, calendarDescriptor, searchDescriptor, payDescriptor, staffDescriptor, dayDescriptor, monthLabel, validSettings, duration } from './data';
 import { useDebounced, useView } from './hooks';
-import { Empty, Icon, MonthSwitcher, Result } from './ui';
+import { Empty, Icon, Loading, MonthSwitcher, Result } from './ui';
+import { LoadingIndicator } from './components/arc/LoadingIndicator';
 import type { CalendarData, Month, Person, PayData, Settings } from './types';
 
 interface MonthProps { month: Month; onMonthChange?: (month: Month) => void }
@@ -19,7 +20,7 @@ export function CalendarPage({ app, month, onMonthChange = () => {}, active, onD
       <MonthSwitcher value={month} onChange={onMonthChange} label="カレンダーの表示月" variant="desktop" />
     </section></div>
     <section className="calendar-wrapper" aria-label={monthLabel(month) + 'のカレンダー'}>
-      <div className="mobile-calendar-overview"><MonthSwitcher value={month} onChange={onMonthChange} label="カレンダーの表示月" /><p className="mobile-shift-summary" aria-live="polite">{data ? `自分の勤務日：${shiftDays}日` : '自分の勤務日を確認中…'}</p></div>
+      <div className="mobile-calendar-overview"><MonthSwitcher value={month} onChange={onMonthChange} label="カレンダーの表示月" /><p className="mobile-shift-summary" aria-live="polite">{data ? `自分の勤務日：${shiftDays}日` : <LoadingIndicator compact label="自分の勤務日を確認中" />}</p></div>
       <div className="calendar-header-row">{'日月火水木金土'.split('').map((day, i) => <div key={day} className={`calendar-header${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}`}>{day}</div>)}</div>
       <Result state={query}>
         {data && <div className="calendar-grid">{Array.from({ length: first.getDay() + days }, (_, index) => {
@@ -45,7 +46,7 @@ export function SearchPage({ app, month, onMonthChange = () => {}, active, searc
     <div className="mobile-calendar-overview page-month-overview"><MonthSwitcher value={month} onChange={onMonthChange} label="スタッフの表示月" /></div>
     <div className="search-page-content">
       <label className="field-label" htmlFor="staffSearchInput">名前・従業員コード</label><input className="form-control" id="staffSearchInput" type="search" maxLength={100} autoComplete="off" placeholder="スタッフを検索" value={search} onChange={e => setSearch(e.target.value)} />
-      <div className="search-results" aria-live="polite">{current ? <Result state={query} label="検索中…">{query.value && (query.value.length ? query.value.map(person => <button key={person.user_id} type="button" className="search-person" onClick={() => onStaff(person.user_id, month)} onFocus={() => void app.prefetch(staffDescriptor(month, person.user_id))} onPointerEnter={() => void app.prefetch(staffDescriptor(month, person.user_id))}><span><strong>{person.name}</strong><small>{person.employee_code || 'コード未設定'}</small></span><Icon name="chevron-right" /></button>) : <Empty>該当するスタッフはいません</Empty>)}</Result> : <p role="status">検索中…</p>}</div>
+      <div className="search-results" aria-live="polite">{current ? <Result state={query} label="検索中…">{query.value && (query.value.length ? query.value.map(person => <button key={person.user_id} type="button" className="search-person" onClick={() => onStaff(person.user_id, month)} onFocus={() => void app.prefetch(staffDescriptor(month, person.user_id))} onPointerEnter={() => void app.prefetch(staffDescriptor(month, person.user_id))}><span><strong>{person.name}</strong><small>{person.employee_code || 'コード未設定'}</small></span><Icon name="chevron-right" /></button>) : <Empty>該当するスタッフはいません</Empty>)}</Result> : <Loading label="検索中" />}</div>
     </div>
   </section>;
 }
@@ -63,7 +64,7 @@ export function PayPage({ app, month, onMonthChange = () => {}, active, settings
       <label className="field-label" htmlFor="hourlyWage">時給（円）<input className="form-control pay-input" id="hourlyWage" type="number" min={0} max={100000} step="1" inputMode="decimal" placeholder="時給を入力" value={settings.hourly_wage} onChange={e => setSettings({ ...settings, hourly_wage: e.target.value })} /></label>
       <label className="field-label" htmlFor="nightBonus">深夜割増率（%）<input className="form-control pay-input" id="nightBonus" type="number" min={0} max={500} step="1" inputMode="decimal" value={settings.night_bonus_percent} onChange={e => setSettings({ ...settings, night_bonus_percent: e.target.value })} /></label>
     </div>
-    {!valid ? <p role="alert" className="field-error">時給は0〜100,000円、深夜割増率は0〜500%で入力してください</p> : !current ? <p role="status">計算中…</p> : <Result state={query} label="計算中…">{data && <div aria-live="polite">
+    {!valid ? <p role="alert" className="field-error">時給は0〜100,000円、深夜割増率は0〜500%で入力してください</p> : !current ? <Loading label="計算中" /> : <Result state={query} label="計算中…">{data && <div aria-live="polite">
       <div className="pay-total"><span>給与の概算</span><strong>{settings.hourly_wage === '' ? '時給を入力してください' : `${data.estimated_yen.toLocaleString('ja-JP')}円`}</strong></div>
       {[['シフト', `${data.shift_count}件`], ['予定時間', duration(data.scheduled_minutes)], ['休憩', duration(data.break_minutes)], ['実働時間', duration(data.worked_minutes)], ['深夜時間', duration(data.night_minutes)]].map(([label, value]) => <div className="pay-row" key={label}><span>{label}</span><strong>{value}</strong></div>)}
     </div>}</Result>}

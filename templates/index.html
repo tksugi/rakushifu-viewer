@@ -15,7 +15,7 @@
 <body data-page="app" data-api-prefix="{{ '/sample' if sample_mode else '' }}">
     <div id="root">
         {% if sample_mode %}<p>サンプル表示 · すべて架空のデータです</p>{% endif %}
-        <p>画面を読み込んでいます。</p>
+        <div class="loading-placeholder" role="status" aria-label="画面を読み込み中"><span class="spinner-ring" aria-hidden="true"></span></div>
         <noscript>このアプリを使用するにはJavaScriptを有効にしてください。
             {% if not sample_mode %}<form method="post" action="/logout"><button type="submit">ログアウト</button></form>{% endif %}
         </noscript>

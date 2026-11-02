@@ -14,8 +14,7 @@
 </head>
 <body data-page="login">
     <div id="root">
-        <h1>シフトビューア</h1>
-        <p>ログイン画面を読み込んでいます。</p>
+        <div class="loading-placeholder" role="status" aria-label="ログイン画面を読み込み中"><span class="spinner-ring" aria-hidden="true"></span></div>
         <button id="btnLogin" type="button" disabled>ログイン</button>
         <a href="{{ url_for('sample.sample_index') }}">ログインなしでサンプルを試す</a>
         <noscript>このアプリを使用するにはJavaScriptを有効にしてください。</noscript>

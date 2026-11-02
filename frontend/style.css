@@ -1262,3 +1262,9 @@ body {
 .data-update-status button { margin-left: 8px; border: 0; background: transparent; color: var(--primary-dark); text-decoration: underline; }
 
 body[data-page="login"] #root { width: 100%; max-width: 400px; }
+
+/* Loading feedback stays graphical and never shifts already displayed data. */
+.result-region { position: relative; }
+.result-refresh { position: absolute; top: -22px; right: 0; display: inline-flex; pointer-events: none; }
+
+.btn-login [role="status"] { color: inherit; }

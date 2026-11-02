@@ -239,7 +239,7 @@ describe('session and input boundaries', () => {
     const f = fixture(); await f.app.ensureSession();
     const view = render(<SearchPage app={f.app} month={month} active search="" setSearch={() => {}} onStaff={() => {}} />, { wrapper: f.wrapper }); await advance();
     view.rerender(<SearchPage app={f.app} month={month} active search="架空" setSearch={() => {}} onStaff={() => {}} />);
-    expect(screen.getByRole('status').textContent).toContain('検索中');
+    expect(screen.getByRole('status', { name: '検索中' }).textContent).toBe('');
     await advance(260); expect(f.requests.at(-1)?.url).toContain('q=%E6%9E%B6%E7%A9%BA');
   });
   it('handles year and date boundaries without local timezone shifts', () => {
