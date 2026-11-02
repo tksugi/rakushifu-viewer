@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function fixture(initialSessionStatus = 200) {
+function fixture(initialSessionStatus = 200, expiresIn = 3600) {
     let now = 1000000;
     let nextTimer = 0;
     const timers = new Map();
@@ -59,7 +59,7 @@ function fixture(initialSessionStatus = 200) {
                     ['X-Shift-Remaining-Seconds', '120'],
                 ]),
                 json: async () => url === '/api/session'
-                    ? { scope: 'fake-session', user_id: 1, expires_in: 3600 }
+                    ? { scope: 'fake-session', user_id: 1, expires_in: expiresIn }
                     : { error: status === 200 ? undefined : 'fixture error', estimated_yen: 1000,
                         shift_count: 1, scheduled_minutes: 60, break_minutes: 0,
                         worked_minutes: 60, night_minutes: 0 },
@@ -91,6 +91,22 @@ function fixture(initialSessionStatus = 200) {
         },
     };
 }
+
+test('a 30-day session survives the browser timer limit and expires at its fixed deadline', async () => {
+    const lifetime = 30 * 24 * 60 * 60 * 1000;
+    const app = fixture(200, lifetime / 1000);
+    await app.flush();
+    app.run('document.hidden = true; clearTimeout(sessionCheckTimer); clearTimeout(visibleRefreshTimer);');
+    const delays = [...app.timers.values()].map(timer => timer.due - 1000000);
+    assert.ok(delays.length > 0 && delays.every(delay => delay <= 2147483647));
+    await app.advance(2147483647);
+    assert.equal(app.run('sessionEnded'), false);
+    await app.advance(lifetime - 2147483647 - 1);
+    assert.equal(app.run('sessionEnded'), false);
+    await app.advance(1);
+    assert.equal(app.run('sessionEnded'), true);
+    assert.equal(app.element('calendarContainer').textContent, '');
+});
 
 test('clicking the active calendar keeps its scheduled refresh', async () => {
     const app = fixture();

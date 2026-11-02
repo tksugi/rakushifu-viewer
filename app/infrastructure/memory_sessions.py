@@ -4,12 +4,13 @@ from threading import RLock
 from typing import Dict, Optional, Tuple
 
 from app.application.session import ActiveSession
+from app.settings import DEFAULT_SESSION_SECONDS
 
 
 class MemorySessionStore:
     """Opaque, expiring app sessions. State stays in this server process only."""
 
-    def __init__(self, lifetime_seconds: int = 3600, max_sessions: int = 500):
+    def __init__(self, lifetime_seconds: int = DEFAULT_SESSION_SECONDS, max_sessions: int = 500):
         self.lifetime_seconds = lifetime_seconds
         self.max_sessions = max_sessions
         self._items: Dict[str, Tuple[float, ActiveSession]] = {}

@@ -37,6 +37,15 @@ function endSession(redirect = true) {
     if (redirect) window.location.replace('/login');
 }
 
+function scheduleSessionExpiry() {
+    clearTimeout(sessionExpiryTimer);
+    if (sessionEnded) return;
+    const remaining = sessionDeadline - Date.now();
+    if (remaining <= 0) { endSession(); return; }
+    // Browser timers accept at most a signed 32-bit millisecond delay.
+    sessionExpiryTimer = setTimeout(scheduleSessionExpiry, Math.min(2147483647, remaining));
+}
+
 async function ensureSession(force = false) {
     if (sessionEnded) throw new Error('Session ended');
     if (Date.now() >= sessionDeadline) {
@@ -71,8 +80,7 @@ async function ensureSession(force = false) {
         resumeCheckRequired = false;
         if (info.expires_in !== null) {
             sessionDeadline = started + Math.max(0, info.expires_in * 1000);
-            clearTimeout(sessionExpiryTimer);
-            sessionExpiryTimer = setTimeout(() => endSession(), Math.max(0, sessionDeadline - Date.now()));
+            scheduleSessionExpiry();
         }
         document.body.classList.remove('session-checking');
         scheduleSessionCheck();

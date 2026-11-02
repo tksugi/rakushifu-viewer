@@ -200,7 +200,7 @@ GitHubの **Actions → テストとCloudflareへのデプロイ** で、テス�
 | `APP_ENV` | `test` | `test`か`production`。Workersは入口で`production`を指定 |
 | `APP_COOKIE_SECURE` | ローカルは`false` | 環境変数が`true`なら有効。Workersでは入口で有効にする |
 | `APP_COOKIE_NAME` | `app_session` | ブラウザに発行するCookie名。`create_app`の設定 |
-| `APP_SESSION_SECONDS` | `3600` | セッションの寿命。`AppSettings.session_seconds`から設定 |
+| `APP_SESSION_SECONDS` | `2592000`（30日） | セッションの寿命。`AppSettings.session_seconds`から設定 |
 | `CACHE_SECONDS` | `120` | 月別シフトのキャッシュ期間。`AppSettings.cache_seconds`から設定 |
 | `MAX_CACHED_MONTHS` | `3` | セッションごとのキャッシュ上限。`AppSettings.max_cached_months`から設定 |
 | `MAX_SESSIONS` | `500` | Flask版のメモリセッション上限。`create_app`の設定 |
@@ -216,7 +216,7 @@ GitHubの **Actions → テストとCloudflareへのデプロイ** で、テス�
 | `production requires the Python Workers runtime` | Flask版では`APP_ENV=test`を指定。Workers版はpywranglerから起動 |
 | `src/worker.py` / `public`が見つからない | `prepare_worker.py`を実行し、`.worker-build`へ移動してから起動 |
 | `SESSIONS` / `LOGIN_LIMITS` / `ASSETS`がない | ビルド先の`wrangler.toml`とバインディング名を確認 |
-| ログイン後もログイン画面に戻る | `app_session` Cookieが保存・送信されているか確認。1時間の期限やサーバー再起動も確認 |
+| ログイン後もログイン画面に戻る | `app_session` Cookieが保存・送信されているか確認。ログインから30日の期限、らくしふ側の認証失効やサーバー再起動も確認 |
 | `429` | 同一IPまたはIPと従業員IDの組合せで試行上限に到達。5分の集計範囲から試行が外れるまで待つ |
 | `502` | らくしふへの接続、認証の引き継ぎ、シフトの応答形式を確認 |
 | `503` | Durable Objectsへのアクセスを確認。再ログインだけでは保存先の障害は解消しない |
