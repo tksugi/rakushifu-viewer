@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AppData } from './data';
 import { App } from './App';
-import { Loading } from './ui';
+import { StartupLoading } from './ui';
 import { subscribeSessionChange } from './session-events';
 
 export function SessionGate({ app }: { app: AppData }) {
@@ -48,7 +48,7 @@ export function SessionGate({ app }: { app: AppData }) {
   }, [app, attempt]);
   return <>
     {ready && <div hidden={hidden}><App app={app} visible={!hidden} /></div>}
-    {(!ready || hidden) && <main className="session-state" aria-label="認証確認">{error ? <><p role="alert">{error}</p><button className="btn-dismiss" onClick={() => setAttempt(value => value + 1)}>再試行</button></> : <Loading label="認証状態を確認中" />}</main>}
+    {(!ready || hidden) && (error ? <main className="session-state" aria-label="認証確認"><p role="alert">{error}</p><button className="btn-dismiss" onClick={() => setAttempt(value => value + 1)}>再試行</button></main> : <StartupLoading label="認証状態を確認中" />)}
     {ready && !hidden && error && <div className="session-warning" role="status">{error}<button className="btn-dismiss" onClick={() => setAttempt(value => value + 1)}>再試行</button></div>}
   </>;
 }

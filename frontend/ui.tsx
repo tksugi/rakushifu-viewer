@@ -14,6 +14,7 @@ export function MonthSwitcher({ value, onChange, label = '表示月', variant = 
 }
 export function Empty({ children }: { children: ReactNode }) { return <div className="empty-state"><div className="empty-state-icon"><Icon name="calendar-x" /></div><p>{children}</p></div>; }
 export function Loading({ label = '読み込み中…' }: { label?: string }) { return <div className="loading-placeholder"><LoadingIndicator label={label} /></div>; }
+export function StartupLoading({ label = '画面を読み込み中' }: { label?: string }) { return <div className="startup-loading"><LoadingIndicator compact label={label} /></div>; }
 
 interface ResultState { error: Error | null; isFetching: boolean; data?: Entry<unknown>; value?: unknown; revoked?: boolean; refetch: () => unknown }
 export function Result({ state, children, label = '読み込み中…' }: { state: ResultState; children: ReactNode; label?: string }) {

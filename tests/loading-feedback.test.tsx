@@ -1,10 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { Loading, Result } from '../frontend/ui';
+import { Loading, Result, StartupLoading } from '../frontend/ui';
+import { Login } from '../frontend/Login';
 
 afterEach(cleanup);
 
 describe('graphical loading feedback', () => {
+  it('shows no text or actions during React startup, then restores the login and sample actions', () => {
+    const view = render(<StartupLoading label="画面を読み込み中" />);
+    expect(screen.getByRole('status', { name: '画面を読み込み中' })).toBeTruthy();
+    expect(document.body.textContent).toBe('');
+    expect(screen.queryByRole('link')).toBeNull();
+    view.rerender(<Login />);
+    const login = screen.getByRole('button', { name: 'ログイン' });
+    const sample = screen.getByRole('link', { name: 'ログインなしでサンプルを試す' });
+    expect(sample.getAttribute('href')).toBe('/sample');
+    expect(login.compareDocumentPosition(sample) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
   it('shows a skeleton without visible waiting text and names the state for screen readers', () => {
     render(<Loading label="読み込み中" />);
     const status = screen.getByRole('status', { name: '読み込み中' });
