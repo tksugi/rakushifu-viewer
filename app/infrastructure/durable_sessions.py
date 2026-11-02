@@ -76,6 +76,7 @@ class DurableSessionStore:
         state = connection.export_state()
         state["expires_at"] = time.time() + self.lifetime_seconds
         state["cache_scope"] = value.cache_scope
+        state["jwt_key"] = value.jwt_key
         initial = next(iter(value.cache.items()), None)
         initial_month = (month_to_json(initial[1][1]) if initial else "")
         initial_key = list(initial[0]) if initial else []
@@ -99,6 +100,8 @@ class DurableSessionStore:
         active.cache_scope = state.get("cache_scope") or hashlib.sha256(
             ("browser-cache:" + token).encode()).hexdigest()
         active.expires_at = state["expires_at"]
+        # Legacy sessions cannot issue JWTs without an explicit new login.
+        active.jwt_key = state.get("jwt_key", "")
         return active
 
     def delete(self, token: str):

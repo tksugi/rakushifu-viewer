@@ -68,6 +68,12 @@ class ShiftUseCases:
         return {"scope": active.cache_scope, "user_id": active.viewer.staff_id,
                 "expires_in": max(0, active.expires_at - time.time())}
 
+    def token_context(self, token: str) -> tuple[str, float]:
+        active = self._active(token)
+        if active.closed or active.expires_at <= time.time() or not active.jwt_key:
+            raise SessionExpired("ログインが必要です")
+        return active.jwt_key, active.expires_at
+
     def _month(self, active: ActiveSession, year: int, month: int) -> ShiftMonth:
         key = (year, month)
         with active.lock:

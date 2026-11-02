@@ -27,7 +27,9 @@ Flask版はPC上で起動し、Workers版はWorkersのローカル開発環境�
 | らくしふアカウント | すかいらーく向けの従業員アカウント | 同左 |
 | Cloudflareアカウント | 不要 | クラウドへのデプロイ時に必要 |
 
-Workersの依存は`pyproject.toml`と`uv.lock`、Workers向けのパッケージ固定は`pylock.toml`で管理しています。Node.js側は`package.json`と`package-lock.json`を使います。Python Workersの開発・デプロイには、Cloudflareが案内する[pywrangler](https://developers.cloudflare.com/workers/languages/python/)を使用します。
+Workersの依存は`pyproject.toml`と`uv.lock`、Workers向けのパッケージ固定は`pylock.toml`で管理しています。JWTにはPyJWT（MIT、HS256のみ）を使います。署名用の秘密はログイン時にセッションごとに生成・保存するため、新しい環境変数や共通鍵の登録は不要です。Workersの`pylock.toml`はPyodide用wheelとruntime SDKの固定を維持し、`uv lock`と`uv export --format pylock.toml --no-dev`で生成したPyJWTエントリーを追加しています。全体を汎用のexportで置き換えないでください。
+
+Node.js側は`package.json`と`package-lock.json`を使います。Python Workersの開発・デプロイには、Cloudflareが案内する[pywrangler](https://developers.cloudflare.com/workers/languages/python/)を使用します。
 
 ## Flask版の起動
 
@@ -211,7 +213,10 @@ GitHubの **Actions → テストとCloudflareへのデプロイ** で、テス�
 | --- | --- | --- |
 | `APP_ENV` | `test` | `test`か`production`。Workersは入口で`production`を指定 |
 | `APP_COOKIE_SECURE` | ローカルは`false` | 環境変数が`true`なら有効。Workersでは入口で有効にする |
-| `APP_COOKIE_NAME` | `app_session` | ブラウザに発行するCookie名。`create_app`の設定 |
+| `APP_COOKIE_NAME` | `app_session` | 移行前のCookieを削除するための名前。認証には使用しない |
+| `APP_ACCESS_COOKIE_NAME` | `app_access` | 1時間有効のJWT Cookie名 |
+| `APP_REFRESH_COOKIE_NAME` | `app_refresh` | 30日有効のJWT Cookie名 |
+| `APP_ACCESS_SECONDS` | `3600`（1時間） | アクセストークンの寿命。セッションの残存期間以内に制限 |
 | `APP_SESSION_SECONDS` | `2592000`（30日） | セッションの寿命。`AppSettings.session_seconds`から設定 |
 | `CACHE_SECONDS` | `120` | 月別シフトのキャッシュ期間。`AppSettings.cache_seconds`から設定 |
 | `MAX_CACHED_MONTHS` | `3` | セッションごとのキャッシュ上限。`AppSettings.max_cached_months`から設定 |
@@ -228,7 +233,7 @@ GitHubの **Actions → テストとCloudflareへのデプロイ** で、テス�
 | `production requires the Python Workers runtime` | Flask版では`APP_ENV=test`を指定。Workers版はpywranglerから起動 |
 | `src/worker.py` / `public`が見つからない | `prepare_worker.py`を実行し、`.worker-build`へ移動してから起動 |
 | `SESSIONS` / `LOGIN_LIMITS` / `ASSETS`がない | ビルド先の`wrangler.toml`とバインディング名を確認 |
-| ログイン後もログイン画面に戻る | `app_session` Cookieが保存・送信されているか確認。ログインから30日の期限、らくしふ側の認証失効やサーバー再起動も確認 |
+| ログイン後もログイン画面に戻る | `app_refresh` Cookieが保存・送信されているか確認。JWT移行直後は再ログインが必要。ログインから30日の期限、らくしふ側の認証失効やサーバー再起動も確認 |
 | `429` | 同一IPまたはIPと従業員IDの組合せで試行上限に到達。5分の集計範囲から試行が外れるまで待つ |
 | `502` | らくしふへの接続、認証の引き継ぎ、シフトの応答形式を確認 |
 | `503` | Durable Objectsへのアクセスを確認。再ログインだけでは保存先の障害は解消しない |

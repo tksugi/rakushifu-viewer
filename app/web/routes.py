@@ -3,6 +3,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 import time
+from urllib.parse import urlsplit
 
 from flask import (Blueprint, current_app, jsonify, redirect, render_template,
                    request, url_for)
@@ -13,6 +14,7 @@ from app.application.errors import (
     UpstreamError,
 )
 from app.application.cache import capture_month
+from . import tokens
 
 
 routes = Blueprint("routes", __name__)
@@ -32,12 +34,15 @@ def _use_cases():
 def _token() -> str:
     if _is_sample():
         return ""
-    return request.cookies.get(current_app.config["APP_COOKIE_NAME"], "")
+    return tokens.verify("access")
 
 
 def _login_required(function):
     @wraps(function)
     def decorated(*args, **kwargs):
+        # The HTML shell has no private data; React refreshes before fetching it.
+        if request.path == "/" and not _token() and tokens.verify("refresh"):
+            return function(*args, **kwargs)
         if not _is_sample() and not _use_cases().authenticated(_token()):
             if request.path.startswith("/api/"):
                 return jsonify({"error": "ログインが必要です"}), 401
@@ -85,8 +90,7 @@ def expired_session(error):
     _use_cases().logout(_token())
     response = jsonify({"error": "ログインの有効期限が切れました"})
     response.status_code = 401
-    response.delete_cookie(current_app.config["APP_COOKIE_NAME"], path="/")
-    return response
+    return tokens.clear(response)
 
 
 @routes.errorhandler(UpstreamError)
@@ -106,7 +110,7 @@ def storage_unavailable(error):
 
 @routes.get("/login")
 def login_page():
-    if _use_cases().authenticated(_token()):
+    if _use_cases().authenticated(_token()) or tokens.verify("refresh"):
         return redirect(url_for("routes.index"))
     return render_template("login.html")
 
@@ -133,24 +137,41 @@ def login():
         token = _use_cases().login(employee_code, password)
     except InvalidCredentials as error:
         return jsonify({"error": str(error)}), 401
-    if _token():
-        _use_cases().logout(_token())
+    previous = tokens.verify("refresh") or _token()
+    if previous:
+        _use_cases().logout(previous)
     response = jsonify({"message": "ログイン成功"})
-    response.set_cookie(
-        current_app.config["APP_COOKIE_NAME"], token,
-        max_age=current_app.config["APP_SESSION_SECONDS"],
-        httponly=True, secure=current_app.config["APP_COOKIE_SECURE"],
-        samesite="Lax", path="/",
-    )
+    tokens.issue_pair(response, token)
+    return response
+
+
+@routes.post("/api/auth/refresh")
+def refresh():
+    origin = request.headers.get("Origin")
+    expected = urlsplit(request.host_url)
+    try:
+        actual = urlsplit(origin) if origin else None
+    except ValueError:
+        return jsonify({"error": "リクエストが不正です"}), 403
+    if (not request.is_json or request.headers.get("Sec-Fetch-Site") == "cross-site"
+            or (actual is not None and (actual.scheme, actual.netloc) !=
+                (expected.scheme, expected.netloc))):
+        return jsonify({"error": "リクエストが不正です"}), 403
+    if not isinstance(request.get_json(silent=True), dict):
+        return jsonify({"error": "リクエストが不正です"}), 403
+    subject = tokens.verify("refresh")
+    if not subject:
+        return tokens.clear(jsonify({"error": "ログインが必要です"})), 401
+    response = jsonify({"message": "アクセストークンを更新しました"})
+    tokens.issue_access(response, subject)
     return response
 
 
 @routes.post("/logout")
 def logout():
-    _use_cases().logout(_token())
+    _use_cases().logout(tokens.verify("refresh") or _token())
     response = redirect(url_for("routes.login_page"))
-    response.delete_cookie(current_app.config["APP_COOKIE_NAME"], path="/")
-    return response
+    return tokens.clear(response)
 
 
 @routes.get("/")

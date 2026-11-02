@@ -20,6 +20,9 @@ def create_app(config=None, use_cases=None, *, worker_runtime=False) -> Flask:
     app.config.update(
         APP_ENV=settings.environment,
         APP_COOKIE_NAME="app_session",
+        APP_ACCESS_COOKIE_NAME="app_access",
+        APP_REFRESH_COOKIE_NAME="app_refresh",
+        APP_ACCESS_SECONDS=60 * 60,
         APP_COOKIE_SECURE=(settings.environment == "production" or
                            os.environ.get("APP_COOKIE_SECURE", "false").lower() == "true"),
         APP_SESSION_SECONDS=settings.session_seconds,
