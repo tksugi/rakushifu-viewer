@@ -196,7 +196,7 @@ class ShiftArchitectureTests(unittest.TestCase):
         self.assertEqual(index_response.status_code, 200)
         self.assertIn(b'method="post" action="/logout"', index_response.data)
         cookie = login_a.headers["Set-Cookie"]
-        self.assertIn("app_session=", cookie)
+        self.assertIn("app_access=", cookie)
         self.assertIn("HttpOnly", cookie)
         self.assertIn("SameSite=Lax", cookie)
         self.assertNotIn("test-password", cookie)

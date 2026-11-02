@@ -131,8 +131,10 @@ class SampleDisplayTests(unittest.TestCase):
         self.real.authenticated.return_value = False
         self.assertEqual(self.client.get("/api/calendar?year=2026&month=10&sample=1").status_code, 401)
         page = self.client.get("/login")
-        self.assertIn(b'href="/sample"', page.data)
-        self.assertLess(page.data.index(b'id="btnLogin"'), page.data.index(b'href="/sample"'))
+        # React renders the login action and sample link after startup.
+        # Before it starts, the server response contains only the loader.
+        self.assertIn(b'data-page="login"', page.data)
+        self.assertIn(b'src="/static/react/app.js"', page.data)
         self.assertEqual(self.client.get("/").status_code, 302)
         self.assertEqual(self.client.get("/sample/api/login").status_code, 404)
         self.assertEqual(self.client.post("/sample/api/pay/estimate", data=b"x" * 20000,

@@ -17,6 +17,7 @@ class ActiveSession:
     month_metadata: dict = field(default_factory=dict)
     cache_scope: str = field(default_factory=lambda: secrets.token_hex(16))
     expires_at: float = 0
+    jwt_key: str = field(default_factory=lambda: secrets.token_urlsafe(48), repr=False)
     closed: bool = False
 
     def close(self) -> None:

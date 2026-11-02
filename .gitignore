@@ -4,6 +4,7 @@ __pycache__/
 .venv-workers/
 .uv-python/
 node_modules/
+static/react/
 .worker-build/
 .worker-build-*/
 .wrangler/

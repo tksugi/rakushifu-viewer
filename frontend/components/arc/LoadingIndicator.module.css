@@ -1,0 +1,35 @@
+/*! @license Arc Library
++MIT License
+
+Copyright (c) 2026 Elia Kuratli
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+/* Adapted from Arc Library's skeleton.module.css and button.module.css (MIT).
+   Component-local tokens preserve the application's existing theme. */
+.root { display: flex; width: 100%; max-width: 320px; min-width: 0; align-items: flex-start; }
+.lines { display: grid; flex: 1; gap: 12px; padding-top: 4px; }
+.line { display: block; width: 100%; height: 12px; border-radius: var(--radius-sm, 10px); background: color-mix(in oklab, var(--border, #e2e8f0) 65%, var(--surface, white)); animation: skeleton-pulse 1.8s cubic-bezier(.65,0,.35,1) calc(var(--index, 0) * 90ms) 11 both; }
+.line:first-child { width: 48%; height: 16px; }
+.line:last-child { width: 72%; }
+.compact { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: none; color: var(--primary, #6366f1); }
+.spinner { display: block; width: 16px; height: 16px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .52; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .line, .spinner { animation: none; } }

@@ -3,12 +3,13 @@ from dataclasses import dataclass
 
 
 MAX_REQUEST_BODY_BYTES = 8 * 1024
+DEFAULT_SESSION_SECONDS = 30 * 24 * 60 * 60
 
 
 @dataclass(frozen=True)
 class AppSettings:
     environment: str
-    session_seconds: int = 3600
+    session_seconds: int = DEFAULT_SESSION_SECONDS
     cache_seconds: int = 120
     max_cached_months: int = 3
 

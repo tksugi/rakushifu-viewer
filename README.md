@@ -23,7 +23,7 @@
 
 ## クイックスタート
 
-ローカル版にはPython 3.10以上とGitを使います。Node.jsは不要です。依存ライブラリはプロジェクト内の `.venv` に導入します。
+ローカル版にはPython 3.10以上、Node.js 22.12以上のLTS版、Gitを使います。画面は起動前にビルドします。依存ライブラリはプロジェクト内の `.venv` に導入します。
 
 > [!NOTE]
 > `APP_ENV=test` はローカル向けの保存方式を選ぶ設定です。通常のログインでは実際のらくしふへ認証情報を送信し、シフトを取得します。架空データで試す場合は、起動後に「ログインなしでサンプルを試す」を選んでください。
@@ -33,6 +33,8 @@ Windows / PowerShell:
 ```powershell
 git clone https://github.com/tksugi/rakushifu-viewer.git
 cd rakushifu-viewer
+npm ci
+npm run build
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-local.txt
 $env:APP_ENV = "test"
@@ -45,6 +47,8 @@ $env:APP_ENV = "test"
 ```sh
 git clone https://github.com/tksugi/rakushifu-viewer.git
 cd rakushifu-viewer
+npm ci
+npm run build
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-local.txt
 APP_ENV=test .venv/bin/python api.py
@@ -123,14 +127,14 @@ Workers版はCloudflare上への公開と、Workersのローカル開発環境�
 
 ## 認証とデータの扱い
 
-通常のログインでは、アプリのサーバーが従業員IDとパスワードを受け取り、らくしふの認証APIへ送信します。パスワードを保存する処理はありません。本人・所属店舗・所属業態は、認証後の利用者情報から特定します。画面の表示には外部CDNのBootstrapとGoogle Fontsも読み込みます。
+通常のログインでは、アプリのサーバーが従業員IDとパスワードを受け取り、らくしふの認証APIへ送信します。パスワードを保存する処理はありません。本人・所属店舗・所属業態は、認証後の利用者情報から特定します。画面の表示には従来と同じ外部CDNのBootstrapとGoogle Fontsも読み込みます。
 
-ブラウザには、らくしふの認証Cookieとは別のアプリ用Cookieを渡します。ログアウトするとアプリのセッションを削除します。給与計算の入力値はブラウザの `localStorage` に保存され、ログアウト後も残ります。削除するには、そのサイトのブラウザ保存データを消してください。
+ブラウザには、らくしふの認証Cookieとは別に、1時間有効のJWTアクセストークンと30日有効のJWTリフレッシュトークンをHttpOnly Cookieで渡します。アクセストークンは必要に応じて自動再発行し、ログインから30日の期限は延長しません。ログアウトするとアプリのセッションを削除します。給与計算の入力値はブラウザの `localStorage` に保存され、ログアウト後も残ります。削除するには、そのサイトのブラウザ保存データを消してください。
 
 <details>
 <summary>セッションの保存場所とCookie属性</summary>
 
-Flask版は認証状態をプロセスのメモリに保持します。Workers版は、認証Cookie・CSRFトークン・利用者を識別する情報・有効期限を、セッションごとのDurable Objectに保存します。Durable Objectsは、Cloudflare上で状態と保存領域をObject単位で管理する仕組みです。月別シフトの永続保存は行いません。
+Flask版は認証状態をプロセスのメモリに保持します。Workers版は、認証Cookie・CSRFトークン・利用者を識別する情報・JWT署名用の秘密・有効期限を、セッションごとのDurable Objectに保存します。Durable Objectsは、Cloudflare上で状態と保存領域をObject単位で管理する仕組みです。月別シフトの永続保存は行いません。
 
 アプリ用Cookieには `HttpOnly`・`SameSite=Lax` を付け、Workers版では `Secure` も付けます。保存期間や削除の詳細は[認証とデータの保持](docs/architecture.md#認証とデータの保持)を参照してください。
 
@@ -162,7 +166,7 @@ Flask版は認証状態をプロセスのメモリに保持します。Workers�
 <details>
 <summary>ソースコードの構成</summary>
 
-バックエンドはPython / Flask、フロントエンドはHTML・CSS・JavaScriptです。
+バックエンドはPython / Flask、フロントエンドはReact・TypeScript・Vite・TanStack Queryです。移行前の配色・レイアウト・操作を維持しています。
 
 ```text
 app/
@@ -170,8 +174,9 @@ app/
   application/     ログイン、シフト参照、検索、キャッシュ制御
   infrastructure/  らくしふ通信、外部JSON変換、環境別セッション
   web/             画面・APIルート
-templates/         HTMLテンプレート
-static/            CSSとJavaScript
+frontend/          React画面、既存デザイン、データ取得
+templates/         Reactを起動するHTMLテンプレート
+static/            キャッシュ基盤とビルド済みCSS・JavaScript
 scripts/           Workers用のビルド準備
 tests/             人工データを使った単体・結合テスト
 api.py             ローカルの入口
@@ -183,6 +188,8 @@ worker.py          WorkersとDurable Objectsの入口
 </details>
 
 ## テスト
+
+フロントエンドは`npm test`でキャッシュとReact画面の回帰テスト、`npm run build`で型検査とビルドを行います。
 
 ローカル用の依存を導入した環境で実行します。Windowsでは次のコマンドを使います。
 
