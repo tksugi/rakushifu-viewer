@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AppData } from './data';
 import { App } from './App';
-import { Button } from './ui';
-import { Skeleton } from './registry/components/skeleton/skeleton';
+import { Loading } from './ui';
 import { subscribeSessionChange } from './session-events';
 
 export function SessionGate({ app }: { app: AppData }) {
@@ -49,7 +48,7 @@ export function SessionGate({ app }: { app: AppData }) {
   }, [app, attempt]);
   return <>
     {ready && <div hidden={hidden}><App app={app} visible={!hidden} /></div>}
-    {(!ready || hidden) && <main className="session-state"><h1>認証状態を確認しています</h1>{error ? <><p role="alert">{error}</p><Button onClick={() => setAttempt(value => value + 1)}>再試行</Button></> : <Skeleton label="認証状態を確認中" lines={3} />}</main>}
-    {ready && !hidden && error && <div className="session-warning" role="status">{error}<Button size="sm" variant="secondary" onClick={() => setAttempt(value => value + 1)}>再試行</Button></div>}
+    {(!ready || hidden) && <main className="session-state"><h1>認証状態を確認しています</h1>{error ? <><p role="alert">{error}</p><button className="btn-dismiss" onClick={() => setAttempt(value => value + 1)}>再試行</button></> : <Loading label="認証状態を確認中" />}</main>}
+    {ready && !hidden && error && <div className="session-warning" role="status">{error}<button className="btn-dismiss" onClick={() => setAttempt(value => value + 1)}>再試行</button></div>}
   </>;
 }

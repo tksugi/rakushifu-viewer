@@ -169,7 +169,7 @@ PR本文は日本語を基本とし、次を記載する。既存のテンプレ
 | `app/application/` | ユースケース、認証状態、月別キャッシュ、外部依存のポート |
 | `app/infrastructure/` | 外部通信、JSON変換、環境別のセッション保存 |
 | `app/web/` | HTTP入力の検証、認証判定、Cookie、画面・API応答 |
-| `frontend/` | React画面、Arcコンポーネント、TanStack Queryとの接続 |
+| `frontend/` | React画面、既存デザイン、TanStack Queryとの接続 |
 | `templates/`、`static/` | 起動HTML、キャッシュ基盤、ビルド済みCSS・JavaScript |
 | `api.py` | ローカルFlaskの入口 |
 | `worker.py` | WorkersとDurable Objectsの入口 |

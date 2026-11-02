@@ -27,7 +27,7 @@ Flaskの画面・APIと、シフト・給与の計算を共通に使い、外部
 
 依存方向は`web / infrastructure → application → domain`です。アプリケーション層は外部依存の操作をポートとして扱うため、テストでは通信とセッションを代替実装に置き換えます。
 
-フロントエンドは`frontend/`のReact・TypeScriptです。Arc Libraryのコンポーネントを使い、TanStack Queryと既存のキャッシュ基盤で、同一オリジンのAPIから画面データを取得します。Viteの生成物は`static/react/`に配置し、`templates/`から起動します。画面資産はアプリから配信し、外部CDNや外部フォントは使いません。
+フロントエンドは`frontend/`のReact・TypeScriptです。従来の画面構造とCSSを維持し、TanStack Queryと既存のキャッシュ基盤で、同一オリジンのAPIから画面データを取得します。Viteの生成物は`static/react/`に配置し、`templates/`から起動します。Bootstrap 5.3.0・Bootstrap Icons 1.11.3はjsDelivrから、InterとNoto Sans JPはGoogle Fontsから従来どおり読み込みます。
 
 ## ログインとらくしふ通信
 
@@ -35,7 +35,7 @@ Flaskの画面・APIと、シフト・給与の計算を共通に使い、外部
 
 `GET /sample`はログイン不要のサンプル画面です。画面からの参照・給与計算は`/sample/api/calendar`、`/sample/api/shifts`、`/sample/api/staff`、`/sample/api/staff/<user_id>`、`/sample/api/pay/estimate`を使います。入力条件、HTTPメソッド、JSONの項目と計算方法は通常のAPIと共通です。通常の`/api/*`は引き続き認証が必要です。
 
-サンプル専用Blueprintは`SampleUseCases`と`SampleConnection`を使い、リクエストごとに架空データだけを生成します。認証Cookie、通常のセッション、Durable Objects、実データのキャッシュや外部通信を参照せず、アプリCookieも発行・削除しません。Flask・Workersともに同じ実装を使います。画面とAPIの応答には`Cache-Control: no-store`を付けます。ReactとArcの画面・スタイルは通常画面と共通で、アプリから配信します。外部CDNや外部フォントは使用しません。
+サンプル専用Blueprintは`SampleUseCases`と`SampleConnection`を使い、リクエストごとに架空データだけを生成します。認証Cookie、通常のセッション、Durable Objects、実データのキャッシュや外部通信を参照せず、アプリCookieも発行・削除しません。Flask・Workersともに同じ実装を使います。画面とAPIの応答には`Cache-Control: no-store`を付けます。Reactの画面・スタイルは通常画面と共通です。Bootstrapやフォントの取得も通常画面と共通です。
 
 給与設定の保存キーはサンプルでは`sample-pay-settings-<user_id>`、通常利用では従来の`pay-settings-<user_id>`です。サンプルを終了しても通常のセッションは削除しません。
 

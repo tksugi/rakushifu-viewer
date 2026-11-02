@@ -1,22 +1,20 @@
 # Reactフロントエンド
 
-React・TypeScript・Vite・TanStack Queryで画面を構成します。Pythonの認証・API・給与計算・セッション保存形式は共通のままです。
+React・TypeScript・Vite・TanStack Queryで、移行前の画面を再現します。Pythonの認証・API・給与計算・セッション保存形式は共通です。
 
 - `main.tsx`：ログイン／アプリの入口。
 - `SessionGate.tsx`：初回・復帰時の認証確認、定期確認、非表示制御。
-- `App.tsx`：3つのタブ、月選択、先読み、タブ別のスクロール位置。
-- `pages.tsx`：カレンダー・スタッフ検索・給与概算。
-- `Details.tsx`：日別／スタッフ詳細、戻る履歴、フォーカス・スクロール復元。
+- `App.tsx`：3つの画面、先読み、タブ別のスクロール位置。
+- `pages.tsx`：既存のカレンダー・スタッフ検索・給与概算。
+- `Details.tsx`：日別／スタッフ詳細、戻る履歴、フォーカス・スクロール復元。Radix Dialogでフォーカスとモーダルのアクセス制御を扱います。
 - `data.ts`・`hooks.ts`：既存キャッシュとTanStack Queryの接続、表示中の再取得。
-- `style.css`：アプリ固有の配色・レイアウト。
+- `style.css`：移行前の`static/style.css`とログイン用CSSを維持。末尾だけにReact・Radixとの接続に必要な指定を追加しています。
 
 `npm ci`で導入し、`npm run build`で型検査と配信用ファイルの作成、`npm test`で人工データによるキャッシュ・Reactの回帰テストを実行します。`npm run dev`はFlaskから配信するファイルを監視ビルドします。ブラウザではFlaskのURLを開き、変更後に再読み込みしてください。
 
-## Arc Library
+## デザインの維持
 
-`registry/`と`lib/motion-tokens.ts`は[Arc Library](https://github.com/kuratlielia/arc-library)のMITライセンスのソースです。Button・Input・Tabs・Dialog・Skeleton・Badgeと共通トークンを、元のパス構成を保って取り込んでいます。ライセンスは`registry/LICENSE`に保存しています。Dialogの閉じるボタンは日本語に変更し、ブラウザ専用ビルドでは不要な`use client`宣言を除いています。Dialogの背景には認証確認中の非表示制御用クラスを追加しています。アプリ固有の見た目は`style.css`で上書きし、元のCSS変数を利用します。
-
-外部CDNや外部フォントへのアクセスは不要です。OSのモーション軽減設定を尊重します。
+紫色の配色、ヘッダー、PCの月見出し、スマートフォンの月切り替え、下部ナビゲーション、検索・給与画面、詳細とログイン画面は移行前の構成を維持します。Bootstrap 5.3.0・Bootstrap Icons 1.11.3・Google Fontsの読み込みも従来どおりです。新しいテーマ、見出し、アバターなどの装飾は追加しません。
 
 ## キャッシュの境界
 

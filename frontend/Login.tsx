@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { CalendarDays, ArrowRight, ArrowUpRight, ShieldCheck, AlertCircle } from 'lucide-react';
-import { Button, Input } from './ui';
+import { Icon } from './ui';
 import { publishSessionChange } from './session-events';
 
 export function Login() {
@@ -27,10 +26,16 @@ export function Login() {
       submitting.current = false; setBusy(false);
     }
   }
-  return <main className="login-page"><div className="login-story"><a className="brand" href="/login"><span className="brand-icon"><CalendarDays size={21} aria-hidden="true" /></span><span>シフトビューア<small>RAKUSHIFU VIEWER</small></span></a><div className="login-copy"><p className="eyebrow">A LITTLE CLARITY, EVERY DAY</p><h1>次のシフトを、<br />気持ちよく。</h1><p>予定も、一緒に働くメンバーも。<br />知りたいことを、ひとつの画面で。</p><div className="login-calendar-art" aria-hidden="true"><div><span>MY SCHEDULE</span><CalendarDays size={18} /></div><p>シフトをひと目で。</p><div className="art-grid">{Array.from({ length: 14 }, (_, i) => <span key={i} className={[1, 3, 5, 8, 10].includes(i) ? 'filled' : ''}>{i + 1}</span>)}</div></div></div><span className="login-footnote">らくしふ非公式の閲覧アプリ</span></div>
-    <div className="login-form-side"><section className="login-card"><span className="login-mark"><CalendarDays size={27} aria-hidden="true" /></span><p className="eyebrow">WELCOME BACK</p><h2>ログイン</h2><p className="login-subtitle">らくしふの従業員アカウントを使用します。</p>
-      {error && <div className="update-error" role="alert" tabIndex={-1} ref={errorRef}><AlertCircle size={18} aria-hidden="true" /><span>{error}</span></div>}
-      <form id="loginForm" method="post" action="/login" onSubmit={submit}><Input label="従業員ID" id="employeeCode" name="employee_code" type="text" maxLength={50} autoComplete="username" required placeholder="従業員IDを入力" /><Input label="パスワード" id="password" name="password" type="password" maxLength={500} autoComplete="current-password" required placeholder="パスワードを入力" /><Button type="submit" id="btnLogin" className="login-submit" loading={busy}>{busy ? 'ログイン中…' : 'ログイン'}<ArrowRight size={17} aria-hidden="true" /></Button></form>
-      <div className="sample-entry"><a href="/sample">ログインなしでサンプルを試す<ArrowUpRight size={16} aria-hidden="true" /></a><p>架空のスタッフ・シフトで各機能を確認できます。</p></div><p className="privacy-note"><ShieldCheck size={16} aria-hidden="true" />パスワードはアプリに保存しません。</p>
-    </section></div></main>;
+  return <main className="login-container"><div className="login-card">
+    <div className="login-header"><div className="login-icon"><Icon name="calendar3" /></div><h1 className="login-title">シフト管理</h1><p className="login-subtitle">らくしふの従業員アカウントでログイン</p></div>
+    <div className="login-body">
+      {error && <div className="error-message show" role="alert" tabIndex={-1} ref={errorRef}><Icon name="exclamation-circle" /><span>{error}</span></div>}
+      <form id="loginForm" method="post" action="/login" onSubmit={submit}>
+        <div className="form-group"><label className="form-label-custom" htmlFor="employeeCode">従業員ID</label><input type="text" className="form-input" id="employeeCode" name="employee_code" placeholder="従業員IDを入力" maxLength={50} autoComplete="username" required /></div>
+        <div className="form-group"><label className="form-label-custom" htmlFor="password">パスワード</label><input type="password" className="form-input" id="password" name="password" placeholder="パスワードを入力" maxLength={500} autoComplete="current-password" required /></div>
+        <button type="submit" className="btn-login" id="btnLogin" disabled={busy}>{busy ? <><span className="spinner-border spinner-border-sm" aria-hidden="true" />ログイン中...</> : <><Icon name="box-arrow-in-right" />ログイン</>}</button>
+      </form>
+      <div className="text-center mt-3"><a href="/sample">ログインなしでサンプルを試す</a><p className="small text-secondary mt-2 mb-0">架空のスタッフ・シフトで各機能を確認できます。</p></div>
+    </div>
+  </div></main>;
 }

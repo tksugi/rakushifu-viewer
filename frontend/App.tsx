@@ -1,11 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { CalendarDays, Users, Banknote, LogOut, ArrowUpRight } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from './registry/components/tabs/tabs';
 import { CalendarPage, SearchPage, PayPage } from './pages';
 import { Details } from './Details';
 import type { Selection } from './Details';
 import { AppData, calendarDescriptor, searchDescriptor, payDescriptor, loadSettings, moveMonth, validMonth, validSettings } from './data';
-import { Badge, Button, MonthSwitcher } from './ui';
+import { Icon } from './ui';
 import { publishSessionChange } from './session-events';
 import type { Month, Settings } from './types';
 
@@ -53,19 +51,31 @@ export function App({ app, visible = true }: { app: AppData; visible?: boolean }
     return () => { canceled = true; clearTimeout(timer); };
     // Settings changes are handled by the pay query, never by a full prefetch sweep.
   }, [app, month, visible]);
-  const headings = { calendar: ['カレンダー', '自分の予定と、一緒に働くメンバーを。'], search: ['スタッフ', '同じ店舗で働くメンバーのシフトを確認。'], pay: ['給与', '予定シフトから、今月の給与を見通す。'] };
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const update = () => setScrolled(window.scrollY > 4);
+    update(); window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
   return <>
-    <header className="app-header"><div className="header-inner"><a href={app.prefix ? '/sample' : '/'} className="brand"><span className="brand-icon"><CalendarDays size={21} aria-hidden="true" /></span><span>シフトビューア<small>RAKUSHIFU VIEWER</small></span></a>{app.prefix ? <a className="exit-link" href="/login">サンプルを終了<ArrowUpRight size={15} aria-hidden="true" /></a> : <form method="post" action="/logout" onSubmit={event => { event.preventDefault(); publishSessionChange(); app.end(false); const form = document.createElement('form'); form.method = 'post'; form.action = '/logout'; form.hidden = true; document.body.appendChild(form); form.submit(); }}><Button type="submit" variant="ghost"><LogOut size={17} aria-hidden="true" /><span>ログアウト</span></Button></form>}</div></header>
+    <header className={`app-header${scrolled ? ' scrolled' : ''}`} id="appHeader">
+      <div className="header-inner">
+        <div className="brand-lockup"><span className="brand-icon" aria-hidden="true"><Icon name="calendar2-week" /></span><span>シフトビューア</span></div>
+        {app.prefix ? <a className="logout-link" href="/login">サンプルを終了</a> : <form method="post" action="/logout" onSubmit={event => {
+          event.preventDefault(); publishSessionChange(); app.end(false);
+          const form = document.createElement('form'); form.method = 'post'; form.action = '/logout'; form.hidden = true; document.body.appendChild(form); form.submit();
+        }}><button className="logout-link" type="submit" aria-label="ログアウト"><Icon name="box-arrow-right" /><span>ログアウト</span></button></form>}
+      </div>
+    </header>
     <main className="page-shell">
-      {app.prefix && <aside className="sample-notice" role="note"><Badge color="teal" size="sm" pill>DEMO</Badge><div><strong>サンプル表示 · すべて架空のデータです</strong><p>60人のスタッフと月ごとのシフトでお試しください。実際のらくしふへの通信は行いません。</p></div></aside>}
-      <div className="page-heading"><div><p className="eyebrow">YOUR WORK, AT A GLANCE</p><h1>{headings[page][0]}</h1><p className="page-description">{headings[page][1]}</p></div><MonthSwitcher value={month} onChange={setMonth} label={page === 'calendar' ? 'カレンダーの表示月' : page === 'search' ? 'スタッフの表示月' : '給与の対象月'} /></div>
-      <Tabs value={page} onValueChange={changePage} activationMode="manual">
-        <nav className="floating-nav" aria-label="画面の切り替え"><TabsList aria-label="表示する画面"><TabsTrigger value="calendar" aria-label="カレンダーを表示"><CalendarDays size={20} aria-hidden="true" /><span>カレンダー</span></TabsTrigger><TabsTrigger value="search" aria-label="スタッフを表示" onPointerEnter={() => void app.prefetch(searchDescriptor(month, search.trim()))}><Users size={20} aria-hidden="true" /><span>スタッフ</span></TabsTrigger><TabsTrigger value="pay" aria-label="給与の概算を表示" onPointerEnter={() => { if (validSettings(settings)) void app.prefetch(payDescriptor(month, settings)); }}><Banknote size={20} aria-hidden="true" /><span>給与</span></TabsTrigger></TabsList></nav>
-        <TabsContent value="calendar" forceMount hidden={page !== 'calendar'} className="page-content"><CalendarPage app={app} month={month} active={visible && page === 'calendar' && !selection} onDay={date => select({ kind: 'day', date })} /></TabsContent>
-        <TabsContent value="search" forceMount hidden={page !== 'search'} className="page-content"><SearchPage app={app} month={month} active={visible && page === 'search' && !selection} search={search} setSearch={setSearch} onStaff={(id, staffMonth) => select({ kind: 'staff', id, month: staffMonth })} /></TabsContent>
-        <TabsContent value="pay" forceMount hidden={page !== 'pay'} className="page-content"><PayPage app={app} month={month} active={visible && page === 'pay' && !selection} settings={settings} setSettings={setSettings} /></TabsContent>
-      </Tabs>
+      {app.prefix && <aside className="sample-notice" role="note"><strong>サンプル表示 · すべて架空のデータです</strong><span>60人のスタッフと月ごとのシフトで、カレンダー・検索・給与概算をお試しください。実際のらくしふへの通信は行いません。</span></aside>}
+      <div hidden={page !== 'calendar'}><CalendarPage app={app} month={month} onMonthChange={setMonth} active={visible && page === 'calendar' && !selection} onDay={date => select({ kind: 'day', date })} /></div>
+      <div hidden={page !== 'search'}><SearchPage app={app} month={month} onMonthChange={setMonth} active={visible && page === 'search' && !selection} search={search} setSearch={setSearch} onStaff={(id, staffMonth) => select({ kind: 'staff', id, month: staffMonth })} /></div>
+      <div hidden={page !== 'pay'}><PayPage app={app} month={month} onMonthChange={setMonth} active={visible && page === 'pay' && !selection} settings={settings} setSettings={setSettings} /></div>
     </main>
+    <nav className="floating-nav" aria-label="画面の切り替え">
+      {([['calendar', 'calendar3', 'カレンダー', 'カレンダーを表示'], ['search', 'people', 'スタッフ', 'スタッフを表示'], ['pay', 'cash-coin', '給与', '給与の概算を表示']] as const).map(([value, icon, text, label]) => <button key={value} type="button" className={`dock-item dock-page${page === value ? ' is-active' : ''}`} aria-label={label} aria-current={page === value ? 'page' : undefined} title={label} onClick={() => changePage(value)}><Icon name={icon} /><span>{text}</span></button>)}
+    </nav>
     <Details app={app} initial={selection} visible={visible} onClose={() => setSelection(null)} returnFocus={returnFocus.current} />
   </>;
 }

@@ -191,16 +191,16 @@ describe('session and input boundaries', () => {
   });
   it('conceals private UI while a return-to-tab session check is failing', async () => {
     const f = fixture(); render(<SessionGate app={f.app} />, { wrapper: f.wrapper }); await advance();
-    expect(screen.getByRole('heading', { name: 'カレンダー' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '2026年11月のカレンダー' })).toBeTruthy();
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     fireEvent(document, new Event('visibilitychange')); await advance();
     f.state.sessionStatus = 503;
     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
     fireEvent(document, new Event('visibilitychange')); await advance();
-    expect(screen.queryByRole('heading', { name: 'カレンダー' })).toBeNull();
+    expect(screen.queryByRole('region', { name: '2026年11月のカレンダー' })).toBeNull();
     expect(screen.getByRole('alert').textContent).toContain('認証状態');
     f.state.sessionStatus = 200; await advance(30010);
-    expect(screen.getByRole('heading', { name: 'カレンダー' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '2026年11月のカレンダー' })).toBeTruthy();
   });
   it('conceals portaled detail dialogs too and restores them only after session verification', async () => {
     const f = fixture(); render(<SessionGate app={f.app} />, { wrapper: f.wrapper }); await advance();
@@ -231,9 +231,9 @@ describe('session and input boundaries', () => {
   it('does not request a pay estimate for an invalid input or show an old amount', async () => {
     const f = fixture(); await f.app.ensureSession();
     const view = render(<PayPage app={f.app} month={month} active settings={{ hourly_wage: '1300', night_bonus_percent: '25' }} setSettings={() => {}} />, { wrapper: f.wrapper });
-    await advance(); expect(screen.getByText('1,300')).toBeTruthy();
+    await advance(); expect(screen.getByText('1,300円')).toBeTruthy();
     view.rerender(<PayPage app={f.app} month={month} active settings={{ hourly_wage: '-1', night_bonus_percent: '25' }} setSettings={() => {}} />);
-    await advance(300); expect(screen.queryByText('1,300')).toBeNull(); expect(f.count('/api/pay/estimate')).toBe(1);
+    await advance(300); expect(screen.queryByText('1,300円')).toBeNull(); expect(f.count('/api/pay/estimate')).toBe(1);
   });
   it('does not show a previous staff search while input is being debounced', async () => {
     const f = fixture(); await f.app.ensureSession();

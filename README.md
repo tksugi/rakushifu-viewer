@@ -127,7 +127,7 @@ Workers版はCloudflare上への公開と、Workersのローカル開発環境�
 
 ## 認証とデータの扱い
 
-通常のログインでは、アプリのサーバーが従業員IDとパスワードを受け取り、らくしふの認証APIへ送信します。パスワードを保存する処理はありません。本人・所属店舗・所属業態は、認証後の利用者情報から特定します。画面のライブラリとスタイルはアプリから配信し、外部CDNや外部フォントは読み込みません。
+通常のログインでは、アプリのサーバーが従業員IDとパスワードを受け取り、らくしふの認証APIへ送信します。パスワードを保存する処理はありません。本人・所属店舗・所属業態は、認証後の利用者情報から特定します。画面の表示には従来と同じ外部CDNのBootstrapとGoogle Fontsも読み込みます。
 
 ブラウザには、らくしふの認証Cookieとは別のアプリ用Cookieを渡します。ログアウトするとアプリのセッションを削除します。給与計算の入力値はブラウザの `localStorage` に保存され、ログアウト後も残ります。削除するには、そのサイトのブラウザ保存データを消してください。
 
@@ -166,7 +166,7 @@ Flask版は認証状態をプロセスのメモリに保持します。Workers�
 <details>
 <summary>ソースコードの構成</summary>
 
-バックエンドはPython / Flask、フロントエンドはReact・TypeScript・Vite・TanStack Queryです。[Arc Library](https://github.com/kuratlielia/arc-library)のコンポーネントを使用しています。
+バックエンドはPython / Flask、フロントエンドはReact・TypeScript・Vite・TanStack Queryです。移行前の配色・レイアウト・操作を維持しています。
 
 ```text
 app/
@@ -174,7 +174,7 @@ app/
   application/     ログイン、シフト参照、検索、キャッシュ制御
   infrastructure/  らくしふ通信、外部JSON変換、環境別セッション
   web/             画面・APIルート
-frontend/          React画面、Arcコンポーネント、データ取得
+frontend/          React画面、既存デザイン、データ取得
 templates/         Reactを起動するHTMLテンプレート
 static/            キャッシュ基盤とビルド済みCSS・JavaScript
 scripts/           Workers用のビルド準備
