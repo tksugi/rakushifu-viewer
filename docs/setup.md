@@ -8,6 +8,7 @@ Flask版はPC上で起動し、Workers版はWorkersのローカル開発環境�
 
 - [必要なツール](#必要なツール)
 - [Flask版の起動](#flask版の起動)
+- [フロントエンドの開発](#フロントエンドの開発)
 - [Workersの起動・デプロイ](#workersの起動デプロイ)
 - [GitHub Actionsから自動デプロイする](#github-actionsから自動デプロイする)
 - [アプリケーションの設定](#アプリケーションの設定)
@@ -22,7 +23,7 @@ Flask版はPC上で起動し、Workers版はWorkersのローカル開発環境�
 | Python | 3.10以上 | 3.14（`>=3.14,<3.15`） |
 | pip | ローカル依存の導入に使用 | 手順では使用しない |
 | uv | 不要 | Python依存とpywranglerの実行に使用 |
-| Node.js / npm | 不要 | Node.js 22以上。Wrangler 4.144.0の要件 |
+| Node.js / npm | Node.js 22.12以上のLTS版。Reactのビルドに使用 | 同左。Wranglerもnpmで導入 |
 | らくしふアカウント | すかいらーく向けの従業員アカウント | 同左 |
 | Cloudflareアカウント | 不要 | クラウドへのデプロイ時に必要 |
 
@@ -35,6 +36,8 @@ Workersの依存は`pyproject.toml`と`uv.lock`、Workers向けのパッケー�
 Windows / PowerShell:
 
 ```powershell
+npm ci
+npm run build
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-local.txt
 $env:APP_ENV = "test"
@@ -44,6 +47,8 @@ $env:APP_ENV = "test"
 macOS / Linux:
 
 ```sh
+npm ci
+npm run build
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-local.txt
 APP_ENV=test .venv/bin/python api.py
@@ -55,6 +60,11 @@ APP_ENV=test .venv/bin/python api.py
 
 ルートの`pyproject.toml`はWorkers向けにPython 3.14を要求します。Python 3.10でFlask版を動かすときは、`uv run`ではなく上記の`requirements-local.txt`を使う手順で導入してください。
 
+## フロントエンドの開発
+
+`npm run dev`はReactの配信用ファイルを監視ビルドします。別のターミナルでFlaskを起動し、FlaskのURLをブラウザで開いてください。変更後は再読み込みします。サンプルは`/sample`で利用できます。`npm test`は架空データだけで既存キャッシュとReactの取得・再試行・認証境界を検証します。`npm run build`では`frontend/`のTypeScript型検査も行います。画面とライブラリの構成は[フロントエンドの説明](../frontend/README.md)を参照してください。
+
+
 ## Workersの起動・デプロイ
 
 ### ビルド用ディレクトリを作成する
@@ -63,18 +73,19 @@ APP_ENV=test .venv/bin/python api.py
 
 ```sh
 npm ci
+npm run build
 python scripts/prepare_worker.py
 cd .worker-build
 ```
 
-`npm ci`はロックファイルに合わせてWranglerを導入します。`prepare_worker.py`は`.worker-build`に次のファイルを配置します。
+`npm ci`はロックファイルに合わせてReactのビルド用依存とWranglerを導入します。`npm run build`はTypeScriptの型検査後、`static/react/`へ配信用ファイルを作成します。この生成物はコミットしません。`prepare_worker.py`は`.worker-build`に次のファイルを配置します。
 
 | 配置先 | 内容 |
 | --- | --- |
 | `src/worker.py` | Workersの入口とDurable Objectのクラス |
 | `src/app/` | Pythonコード。ローカル専用の通信・セッション・試行制限実装を除く |
 | `src/templates/` | HTMLテンプレート |
-| `public/static/` | CSSとJavaScript |
+| `public/static/` | CSSとJavaScript（ビルド済みの`static/react/`を含む） |
 | ディレクトリ直下 | `wrangler.toml`、`pyproject.toml`、`uv.lock`、`pylock.toml` |
 
 **スクリプトは既存の`.worker-build`全体を削除してから再作成します。** ローカルDurable Objectsのデータ、仮想環境、生成された依存も削除されます。クラウド上のDurable Objectsは、この操作では削除されません。
@@ -127,6 +138,7 @@ uv run pywrangler deploy
 開発サーバーを停止してプロジェクトのルートへ戻り、再作成します。
 
 ```sh
+npm run build
 python scripts/prepare_worker.py
 cd .worker-build
 uv run pywrangler dev
@@ -162,7 +174,7 @@ uv run pywrangler dev
 | `main`・`dev`宛てのPull Request | テストのみ |
 | Actions画面から手動実行 | テスト。選択ブランチが`main`の場合は成功後にデプロイ |
 
-テストはPython 3.10で`requirements-local.txt`を導入し、`python -m unittest discover -s tests -v`を実行します。デプロイは別ジョブでPython 3.14、Node.js 22、uv、Wranglerを準備します。`prepare_worker.py`でファイルを配置し、`.worker-build`内で`uv run --locked pywrangler deploy`を実行します。
+テストはPython 3.10で`requirements-local.txt`を導入し、`python -m unittest discover -s tests -v`を実行します。Node.js 22で`npm ci`・`npm test`・`npm run build`とWorkers配布ファイルの準備も確認します。デプロイは別ジョブでPython 3.14、Node.js 22、uv、Wranglerを準備します。`npm run build`と`prepare_worker.py`で画面と配布ファイルを作成し、`.worker-build`内で`uv run --locked pywrangler deploy`を実行します。
 
 デプロイジョブはテストジョブの成功を条件とします。`main`の実行は直列化し、デプロイの途中で別のpushによるキャンセルを行いません。Pull Requestのテストは、新しい変更が届くと以前の実行をキャンセルします。
 
@@ -229,7 +241,7 @@ APIのエラー形式は[技術仕様](architecture.md#http-api)に、画面上�
 
 ## 検証範囲
 
-ローカル用Python環境で`python -m unittest discover -s tests -v`を実行します。ブラウザのメモリキャッシュと画面の自動更新のテストは、Node.js 22以上で`node --test tests/test_browser_cache.js tests/test_view_refresh.js`を実行できます。追加のnpm依存は不要です。既存CIはPythonのunittestが対象で、JavaScriptの単体テストとブラウザ操作はローカルで別途確認します。
+ローカル用Python環境で`python -m unittest discover -s tests -v`を実行します。Node.js 22.12以上のLTS版で`npm ci`・`npm test`・`npm run build`を実行すると、キャッシュ基盤とReact画面の回帰テスト、型検査、配信用ファイルの作成を確認できます。CIも同じ検証とWorkers配布ファイルの準備を実行します。実ブラウザの操作とWorkersランタイムは別途確認します。
 
 | 対象 | 確認状況 |
 | --- | --- |
