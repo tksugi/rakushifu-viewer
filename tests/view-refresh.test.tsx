@@ -46,6 +46,20 @@ beforeEach(() => {
 afterEach(() => { cleanup(); instances.splice(0).forEach(app => app.end(false)); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('React refresh and cache integration', () => {
+  it('keeps a 30-day session past the browser timer limit and clears it at the fixed deadline', async () => {
+    const f = fixture();
+    const lifetime = 30 * 24 * 60 * 60 * 1000;
+    f.state.expires = lifetime / 1000;
+    await f.app.ensureSession();
+    await advance(2147483647);
+    expect(f.app.ended).toBe(false);
+    await advance(lifetime - 2147483647 - 1);
+    expect(f.app.ended).toBe(false);
+    await advance(1);
+    expect(f.app.ended).toBe(true);
+    expect(f.end).toHaveBeenCalledOnce();
+    expect(f.app.info).toBeNull();
+  });
   it('keeps scheduled refresh when the active calendar is selected again', async () => {
     const f = fixture(); await f.app.ensureSession();
     const hook = renderHook(() => useView(f.app, calendarDescriptor(month), true), { wrapper: f.wrapper });

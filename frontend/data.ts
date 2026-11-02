@@ -81,12 +81,18 @@ export class AppData {
       this.cache.scope = info.scope;
       if (info.expires_in !== null) {
         this.deadline = started + Math.max(0, info.expires_in * 1000);
-        clearTimeout(this.expiryTimer);
-        this.expiryTimer = setTimeout(() => this.end(), Math.min(2147483647, Math.max(0, this.deadline - Date.now())));
+        this.scheduleExpiry();
       }
       return info;
     })();
     try { return await this.check; } finally { this.check = null; }
+  }
+  private scheduleExpiry() {
+    clearTimeout(this.expiryTimer);
+    if (this.ended) return;
+    const remaining = this.deadline - Date.now();
+    if (remaining <= 0) { this.end(); return; }
+    this.expiryTimer = setTimeout(() => this.scheduleExpiry(), Math.min(2147483647, remaining));
   }
   settingsKey() { return `${this.prefix ? 'sample-' : ''}pay-settings-${this.info!.user_id}`; }
   end(redirect = true) {
