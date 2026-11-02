@@ -1092,3 +1092,179 @@ body {
 .session-checking .page-shell,
 .session-checking .floating-nav,
 .session-checking #detailModal { visibility: hidden; }
+
+/* Login styles preserved from the original template. */
+*, *::before, *::after { box-sizing: border-box; }
+        body[data-page="login"] {
+            font-family: var(--font-sans);
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            -webkit-font-smoothing: antialiased;
+        }
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            animation: fadeInUp .5s cubic-bezier(.4,0,.2,1) both;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .login-card {
+            background: var(--surface);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-lg), 0 0 0 1px rgba(0,0,0,.03);
+            overflow: hidden;
+        }
+        .login-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            padding: 36px 32px 28px;
+            text-align: center;
+            position: relative;
+        }
+        .login-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px; left: 0; right: 0;
+            height: 24px;
+            background: var(--surface);
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        }
+        .login-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: rgba(255,255,255,.2);
+            backdrop-filter: blur(8px);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        .login-icon i {
+            font-size: 1.5rem;
+            color: #fff;
+        }
+        .login-title {
+            color: #fff;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -.01em;
+        }
+        .login-subtitle {
+            color: rgba(255,255,255,.75);
+            font-size: .82rem;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+        .login-body {
+            padding: 8px 32px 32px;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-label-custom {
+            display: block;
+            font-size: .78rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            letter-spacing: .01em;
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            border: 1.5px solid var(--border);
+            background: var(--surface);
+            font-family: var(--font-sans);
+            font-size: .9rem;
+            color: var(--text-primary);
+            transition: all var(--transition-fast);
+            outline: none;
+        }
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+        .form-input:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+        }
+        .btn-login {
+            width: 100%;
+            padding: 13px;
+            border-radius: var(--radius-md);
+            border: none;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: #fff;
+            font-family: var(--font-sans);
+            font-weight: 600;
+            font-size: .9rem;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            box-shadow: 0 2px 8px rgba(99,102,241,.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-login:hover {
+            box-shadow: 0 4px 16px rgba(99,102,241,.35);
+            transform: translateY(-1px);
+        }
+        .btn-login:active {
+            transform: translateY(0);
+        }
+        .btn-login:disabled {
+            opacity: .7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .error-message {
+            background: #fef2f2;
+            color: var(--danger);
+            font-size: .82rem;
+            font-weight: 500;
+            padding: 10px 14px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid rgba(239,68,68,.15);
+        }
+        .error-message.show {
+            display: flex;
+        }
+        .error-message i {
+            font-size: .9rem;
+            flex-shrink: 0;
+        }
+
+/* React/Radix integration only; visual values above are the original design. */
+[hidden] { display: none !important; }
+.calendar-day { font: inherit; color: inherit; }
+.calendar-day:focus-visible { outline: 3px solid var(--primary-light); outline-offset: 2px; }
+.react-detail-dialog { position: fixed; z-index: 1055; inset: 0; margin: auto; width: min(500px, calc(100vw - 16px)); height: fit-content; outline: none; }
+.react-detail-dialog .modal-content { background: var(--surface); }
+.session-checking .react-detail-dialog, .session-checking .modal-backdrop { visibility: hidden; pointer-events: none !important; }
+.session-state { max-width: 460px; margin: 15vh auto; padding: 26px; }
+.session-state h1 { font-size: 1.1rem; margin-bottom: 24px; }
+.session-warning { position: fixed; bottom: 100px; left: 16px; right: 16px; margin: auto; max-width: 680px; padding: 12px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); z-index: 160; font-size: .8rem; }
+.session-warning button { margin-top: 8px; }
+.field-error { display: block; margin-top: 6px; color: var(--danger); font-size: .75rem; }
+.data-update-status button { margin-left: 8px; border: 0; background: transparent; color: var(--primary-dark); text-decoration: underline; }
+
+body[data-page="login"] #root { width: 100%; max-width: 400px; }
+
+/* Loading feedback stays graphical and never shifts already displayed data. */
+.result-region { position: relative; }
+.result-refresh { position: absolute; top: -22px; right: 0; display: inline-flex; pointer-events: none; }
+
+.btn-login [role="status"] { color: inherit; }

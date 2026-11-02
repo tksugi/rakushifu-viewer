@@ -12,6 +12,7 @@ from app.application.errors import (
     CredentialsUnavailable, SessionExpired, StorageUnavailable, UpstreamError,
 )
 from app.application.session import ActiveSession
+from app.settings import DEFAULT_SESSION_SECONDS
 
 from .worker_state import month_from_json, month_to_json, viewer_from_dict
 
@@ -60,7 +61,7 @@ class DurableConnection:
 
 
 class DurableSessionStore:
-    def __init__(self, lifetime_seconds=3600, cache_seconds=120,
+    def __init__(self, lifetime_seconds=DEFAULT_SESSION_SECONDS, cache_seconds=120,
                  max_cached_months=3):
         self.lifetime_seconds = lifetime_seconds
         self.cache_seconds = cache_seconds
